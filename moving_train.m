@@ -2,13 +2,13 @@
 %Buffer(-0.1 m)
 centers=[1.16, 0.55];
 radii=0.35;
-buffer1=viscircles(centers,radii);
+buffer1=viscircles(centers,radii, 'LineStyle', '--', 'LineWidth', 1);
 hold on
 
 %Buffer(+0.1 m)
 centers=[1.16, 0.55];
 radii=0.55;
-buffer2=viscircles(centers,radii);
+buffer2=viscircles(centers,radii, 'LineStyle', '--', 'LineWidth', 1);
 hold on
 
 %True Value
@@ -27,7 +27,7 @@ ans1_LOS=plot(X_LOS,Y_LOS,'b-')
 %num1=xlsread('NLOS_movingtrain_1anchor.xlsx');
 %X_NLOS=num1(:,1);
 %Y_NLOS=num1(:,2);
-%ans1_NLOS=plot(X_NLOS,Y_NLOS,'b-')
+%ans1_NLOS=plot(X_NLOS,Y_NLOS,'b-', 'edgealpha',0.2)
 
 
 %axis([0 3 0 3]);
@@ -39,9 +39,10 @@ anchor2=plot(0,1.1,'^');
 anchor3=plot(2.33,1.11,'^');
 anchor4=plot(2.33,0,'^');
 
-xlim([-.5,2.5]);
-ylim([-.5,2.5]);
-
+xlim([-.5,3.5]);
+ylim([-.5,1.5]);
+daspect([1 1 1])
+grid on
 hold off
 
 
