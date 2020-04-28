@@ -2,19 +2,19 @@
 %Buffer(-0.1 m)
 centers=[1.16, 0.55];
 radii=0.35;
-buffer1=viscircles(centers,radii);
+buffer1=viscircles(centers,radii,'LineWidth',0.5,'LineStyle','--');
 hold on
 
 %Buffer(+0.1 m)
 centers=[1.16, 0.55];
 radii=0.55;
-buffer2=viscircles(centers,radii);
+buffer2=viscircles(centers,radii,'LineWidth',0.5,'LineStyle','--');
 hold on
 
 %True Value
 centers=[1.16, 0.55];
 radii=0.45;
-truevalue=viscircles(centers,radii);
+truevalue=viscircles(centers,radii,'LineWidth',0.5,'LineStyle','--');
 hold on
 
 %Measured Value from decawave LOS

@@ -8,7 +8,7 @@ hold on
 %Buffer(+0.1 m)
 centers=[1.16, 0.55];
 radii=0.55;
-buffer2=viscircles(centers,radii);
+buffer2=viscircles(centers,radii,'LineWidth',1,'LineStyle','--');
 hold on
 
 %True Value
@@ -17,11 +17,19 @@ radii=0.45;
 truevalue=viscircles(centers,radii);
 hold on
 
-%Measured Value from decawave
-num1=xlsread('moving_train1.xlsx');
-X=num1(:,1);
-Y=num1(:,2);
-ans1=plot(X,Y,'b-')
+%Measured Value from decawave LOS
+%num1=xlsread('moving_train1.xlsx');
+%X_LOS=num1(:,1);
+%Y_LOS=num1(:,2);
+%ans1_LOS=plot(X_LOS,Y_LOS,'b-')
+
+%Measured Value from decawave NLOS(Anchor 3 blocked)
+num1=xlsread('NLOS_movingtrain_1anchor.xlsx');
+X_NLOS=num1(:,1);
+Y_NLOS=num1(:,2);
+ans1_NLOS=plot(X_NLOS,Y_NLOS,'b-')
+
+
 %axis([0 3 0 3]);
 
 %Anchor Positions
@@ -37,7 +45,7 @@ ylim([-.5,2.5]);
 hold off
 
 
-legend([ans1, truevalue, buffer1, buffer2,], 'Measured value', 'True Value', 'Buffer(-0.1m)', 'Buffer(+0.1m)','Anchors');
+legend([ans1_NLOS, truevalue, buffer1, buffer2,anchor1,anchor2,anchor3,anchor4], 'Measured value', 'True Value', 'Buffer(-0.1m)', 'Buffer(+0.1m)','Anchor1','Anchor2','Anchor3','Anchor4');
 title('Moving train');
 xlabel('Distance in meters');
 ylabel('Distance in meters');
