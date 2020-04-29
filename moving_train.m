@@ -28,7 +28,8 @@ ylim([-.5,1.5]);
 daspect([1 1 1]);
 grid on;
 legend([ans1_LOS, track_circle, buffer_los_inner, anch], 'Measured Position', 'True Position', 'Buffer (±0.1m)', 'Anchor');
-title('Moving Train Measurement with One Anchor Blocked');
+title('Moving Train Measurement Perfect LOS Conditions');
+
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');
 hold off;
@@ -40,7 +41,7 @@ radii_nlos_outer=0.65;
 figure(2);
 set(gcf,'unit','normalized','position',[0.2,0.2,0.5,0.5]);
 buffer_nlos_inner=viscircles(CENTERS, radii_nlos_inner, 'LineStyle', '--', 'LineWidth', 1, 'Color','m');
-buffer_nlos_outer=viscircles(centers, radii_nlos_outer, 'LineStyle', '--', 'LineWidth', 1, 'Color','m');
+buffer_nlos_outer=viscircles(CENTERS, radii_nlos_outer, 'LineStyle', '--', 'LineWidth', 1, 'Color','m');
 %True Position, in both LOS and NLOS
 track_circle=viscircles(CENTERS, RADII_TRUE_TRACK, 'LineWidth',1,'LineStyle','-','Color','r');
 hold on;
@@ -64,7 +65,7 @@ daspect([1 1 1]);
 grid on;
 legend([ans1_NLOS, track_circle, buffer_nlos_inner, anch, bloced_anch], ...
     'Measured Position', 'True Position', 'Buffer (±0.2m)', 'Unblocked Anchor','Blocked Anchor');
-title('Moving Train Measurement Perfect LOS Conditions');
+title('Moving Train Measurement with One Anchor Blocked');
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');
 hold off;
