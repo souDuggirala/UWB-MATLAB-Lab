@@ -46,7 +46,6 @@ for i = 1:1:8
     x_s = xradius * cos(theta) + xcenter;
     y_s = yradius * sin(theta) + ycenter;
     h = fill(x_s,y_s,'b','facealpha',0.3);
-    a5 = plot(x_s, y_s, 'b');
     hold on
 end
 
@@ -67,6 +66,7 @@ true_pos = plot(X_TRUE,Y_TRUE,'r*');
 measured_1 = plot(x_geo1,y_geo1,'.b');
 axis([-0.5 2.5 -0.5 3]);
 daspect([1 1 1]);
+grid on;
 l = legend([true_pos,measured_1,std_1,anch,buff, block],...
     'True Position','Measured Position','Standard Deviation (Oval)',...
     'Anchor', 'Accuracy Buffer (±0.1m)', 'Blockage');
@@ -93,7 +93,6 @@ for i = 1:1:8
     x_s = xradius * cos(theta) + xcenter;
     y_s = yradius * sin(theta) + ycenter;
     h = fill(x_s,y_s,'b','facealpha',0.3);
-    a6 = plot(x_s, y_s);
     hold on
 end
 % Plot the connection from truth to measurements
@@ -113,6 +112,7 @@ true_pos = plot(X_TRUE,Y_TRUE,'r*');
 measured_2 = plot(x_geo2,y_geo2,'.b');
 axis([-0.5 2.5 -0.5 3]);
 daspect([1 1 1]);
+grid on;
 l = legend([true_pos, measured_2, std_1, anch, anch_add, buff, block],...
     'True Position','Measured Position','Standard Deviation (Oval)',...
     'Original Anchors', 'Added Anchor', 'Accuracy Buffer (±0.1m)', 'Blocakge');
@@ -141,6 +141,7 @@ for i = 1:1:8
     hold on
 end
 daspect([1 1 1]);
+grid on;
 l = legend([true_pos,e1,buff],'True Position','Measured Position','Accuracy Buffer (±0.1m)');
 set(l, 'Location', 'northeast');
 axis([-0.5 2.5 1.2 1.7]);
@@ -164,6 +165,7 @@ for i = 1:1:8
     hold on
 end
 daspect([1 1 1]);
+grid on;
 l = legend([true_pos,e2,buff],'True Position','Measured Position','Accuracy Buffer (±0.1m)');
 set(l, 'Location', 'northeast');
 axis([-0.5 2.5 1.2 1.7]);
