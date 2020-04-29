@@ -50,12 +50,20 @@ X_NLOS=nlos_measurement(:,1);
 Y_NLOS=nlos_measurement(:,2);
 ans1_NLOS=plot(X_NLOS,Y_NLOS,'b-');
 %plotting the position of anchors
-anch=plot(X_ANCHOR,Y_ANCHOR,'b^');
+x_unblocked_anch = X_ANCHOR;
+y_unblocked_anch = Y_ANCHOR;
+x_blocked_anch = x_unblocked_anch(3);
+y_blocked_anch = y_unblocked_anch(3);
+x_unblocked_anch(3) = [];
+y_unblocked_anch(3) = [];
+anch = plot(x_unblocked_anch,y_unblocked_anch,'b^');
+bloced_anch = plot(x_blocked_anch, y_blocked_anch, 'r^');
 xlim([-.5,3.5]);
 ylim([-.5,1.5]);
 daspect([1 1 1]);
 grid on;
-legend([ans1_NLOS, track_circle, buffer_nlos_inner, anch], 'Measured Position', 'True Position', 'Buffer (±0.2m)', 'Anchor');
+legend([ans1_NLOS, track_circle, buffer_nlos_inner, anch, bloced_anch], ...
+    'Measured Position', 'True Position', 'Buffer (±0.2m)', 'Unblocked Anchor','Blocked Anchor');
 title('Moving Train Measurement Perfect LOS Conditions');
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');
