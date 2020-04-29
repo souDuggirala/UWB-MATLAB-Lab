@@ -1,22 +1,19 @@
 x=[0,0.25,0.5,0.75,1,1.25,1.5,1.75];%Ground truth
 y=[1.4,1.4,1.4,1.4,1.4,1.4,1.4,1.4,];
-ans1=plot(x,y,'*');
+ans1=plot(x,y,'r*');
 hold on
 
 %Anchor position for geo_1
-%anchor1=plot(0,0,'^');
-%anchor2=plot(1,0,'^');
-%anchor3=plot(2,0,'^');
-%anchor4=plot(0,2.8,'^');
-%anchor5=plot(2,2.8,'^');
+%x_anch=[0,1,2,0,2];
+%y_anch=[0,0,0,2.8,2.8];
+%anch=plot(x_anch,y_anch,'b^');
 
 %Anchor position for geo_2
-anchor1=plot(0,0,'^');
-anchor2=plot(1,0,'^');
-anchor3=plot(2,0,'^');
-anchor4=plot(0,2.8,'^');
-anchor5=plot(2,2.8,'^');
-anchor6=plot(1,0.7,'^');
+x_anch=[0,1,2,0,2,1];
+y_anch=[0,0,0,2.8,2.8,0.7];
+anch=plot(x_anch,y_anch,'b^');
+
+
 %Plot the buffer (+-10cm) for decawave
 rectangle('Position',[-0.10 1.3 2 0.25]);
 
@@ -48,10 +45,10 @@ for i = 1:1:8
 end
 
 
-ans2=plot(x_geo2,y_geo2,'o');
-%ans3=plot(x_geo2,y_geo2,'o');
+ans2=plot(x_geo2,y_geo2,'b-o');
+%ans3=plot(x_geo2,y_geo2,'b-o');
 axis([-0.5 3 -0.5 3]);
-legend([ans1,ans2,a5,anchor1,anchor2,anchor3,anchor4,anchor5,anchor6],'True value','Measured value','Standard Deviation','anchor1','anchor2','anchor3','anchor4','anchor5','anchor6');
+legend([ans1,ans2,a5,anch],'True value','Measured value','Standard Deviation','anchor');
 title('Geofencing');
 xlabel('Distance in meters');
 ylabel('Distance in meters');
