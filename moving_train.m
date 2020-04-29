@@ -1,68 +1,60 @@
-
-%Buffer(-0.2 m)
-centers=[1.16, 0.55];
-<<<<<<< HEAD
-radii=0.25;
-buffer1=viscircles(centers,radii,'LineWidth',0.5,'LineStyle','--','Color','g');
-=======
-radii=0.35;
-buffer1=viscircles(centers,radii, 'LineStyle', '--', 'LineWidth', 1);
->>>>>>> 28c94679a4f330c76c7df0ca61e83efed7a126e1
-hold on
-
-%Buffer(+0.2 m)
-centers=[1.16, 0.55];
-<<<<<<< HEAD
-radii=0.65;
-buffer2=viscircles(centers,radii,'LineWidth',0.5,'LineStyle','--','Color','g');
-=======
-radii=0.55;
-buffer2=viscircles(centers,radii, 'LineStyle', '--', 'LineWidth', 1);
->>>>>>> 28c94679a4f330c76c7df0ca61e83efed7a126e1
-hold on
-
-%True Value
-centers=[1.16, 0.55];
-radii=0.45;
-truevalue=viscircles(centers,radii,'LineWidth',0.5,'LineStyle','-','Color','r');
-hold on
-
-%Measured Value from decawave LOS
-%num1=xlsread('moving_train1.xlsx');
-%X_LOS=num1(:,1);
-%Y_LOS=num1(:,2);
-%ans1_LOS=plot(X_LOS,Y_LOS,'b-')
-
-%Measured Value from decawave NLOS(Anchor 3 blocked)
-<<<<<<< HEAD
-num1=xlsread('NLOS_movingtrain_1anchor.xlsx');
-X_NLOS=num1(:,1);
-Y_NLOS=num1(:,2);
-ans1_NLOS=plot(X_NLOS,Y_NLOS,'b-')
-=======
-%num1=xlsread('NLOS_movingtrain_1anchor.xlsx');
-%X_NLOS=num1(:,1);
-%Y_NLOS=num1(:,2);
-%ans1_NLOS=plot(X_NLOS,Y_NLOS,'b-', 'edgealpha',0.2)
->>>>>>> 28c94679a4f330c76c7df0ca61e83efed7a126e1
-
-
-%axis([0 3 0 3]);
+CENTERS=[1.16, 0.55];
+RADII_TRUE_TRACK=0.45;
 
 %Anchor Positions
-x_anch=[0, 0, 2.33, 2.33]
-y_anch=[0,1.11,1.11,0];
-anch=plot(x_anch,y_anch,'b^');
+X_ANCHOR = [0,    0,      2.33,   2.33];
+Y_ANCHOR = [0,    1.11,   1.11,   0];
 
+%LOS, no anchors blocked
+%Buffer(±0.1 m), LOS
+radii_los_inner=0.35;
+radii_los_outer=0.55;
+figure(1);
+buffer_los_inner=viscircles(CENTERS, radii_los_inner, 'LineStyle', '--', 'LineWidth', 1, 'Color','m');
+buffer_los_outer=viscircles(CENTERS, radii_los_outer, 'LineStyle', '--', 'LineWidth', 1, 'Color','m');
+%True Position, in both LOS and NLOS
+track_circle=viscircles(CENTERS, RADII_TRUE_TRACK, 'LineWidth',1,'LineStyle','-','Color','r');
+hold on;
+% Measured Position, LOS
+los_measurement=xlsread('./moving_train1.xlsx');
+X_LOS=los_measurement(:,1);
+Y_LOS=los_measurement(:,2);
+ans1_LOS=plot(X_LOS,Y_LOS,'b-');
+%plotting the position of anchors
+anch=plot(X_ANCHOR,Y_ANCHOR,'b^');
 xlim([-.5,3.5]);
 ylim([-.5,1.5]);
-daspect([1 1 1])
-grid on
-hold off
+daspect([1 1 1]);
+grid on;
+legend([ans1_LOS, track_circle, buffer_los_inner, anch], 'Measured Position', 'True Position', 'Buffer(±0.1m)', 'Anchor');
+title('Moving Train Measurement with One Anchor Blocked');
+xlabel('X coordinate (m)');
+ylabel('Y coordinate (m)');
+hold off;
 
-
-legend([ans1_NLOS, truevalue, buffer1, buffer2,anch], 'Measured value', 'True Value', 'Buffer(-0.2m)', 'Buffer(+0.2m)','Anchor');
-title('Moving train');
-xlabel('Distance in meters');
-ylabel('Distance in meters');
-
+%NLOS, blocking one anchor
+%Buffer(±0.2 m), NLOS
+radii_nlos_inner=0.25;
+radii_nlos_outer=0.65;
+figure(2)
+buffer_nlos_inner=viscircles(CENTERS, radii_nlos_inner, 'LineStyle', '--', 'LineWidth', 1, 'Color','m');
+buffer_nlos_outer=viscircles(centers, radii_nlos_outer, 'LineStyle', '--', 'LineWidth', 1, 'Color','m');
+%True Position, in both LOS and NLOS
+track_circle=viscircles(CENTERS, RADII_TRUE_TRACK, 'LineWidth',1,'LineStyle','-','Color','r');
+hold on;
+% Measured Position, NLOS
+nlos_measurement=xlsread('./NLOS_movingtrain_1anchor.xlsx');
+X_NLOS=nlos_measurement(:,1);
+Y_NLOS=nlos_measurement(:,2);
+ans1_NLOS=plot(X_NLOS,Y_NLOS,'b-');
+%plotting the position of anchors
+anch=plot(X_ANCHOR,Y_ANCHOR,'b^');
+xlim([-.5,3.5]);
+ylim([-.5,1.5]);
+daspect([1 1 1]);
+grid on;
+legend([ans1_NLOS, track_circle, buffer_nlos_inner, anch], 'Measured Position', 'True Position', 'Buffer(±0.2m)', 'Anchor');
+title('Moving Train Measurement Perfect LOS Conditions');
+xlabel('X coordinate (m)');
+ylabel('Y coordinate (m)');
+hold off;
