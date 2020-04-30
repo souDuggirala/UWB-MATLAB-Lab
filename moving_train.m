@@ -27,7 +27,7 @@ xlim([-.5,3.5]);
 ylim([-.5,1.5]);
 daspect([1 1 1]);
 grid on;
-legend([ans1_LOS, track_circle, buffer_los_inner, anch], 'Measured Position', 'True Position', 'Buffer (ï¿½0.1m)', 'Anchor');
+legend([ans1_LOS, track_circle, buffer_los_inner, anch], 'Measured Position', 'True Position', 'Buffer (±0.1m)', 'Anchor');
 title('Moving Train Measurement Perfect LOS Conditions');
 
 xlabel('X coordinate (m)');
@@ -64,7 +64,7 @@ ylim([-.5,1.5]);
 daspect([1 1 1]);
 grid on;
 legend([ans1_NLOS, track_circle, buffer_nlos_inner, anch, bloced_anch], ...
-    'Measured Position', 'True Position', 'Buffer (ï¿½0.2m)', 'Unblocked Anchor','Blocked Anchor');
+    'Measured Position', 'True Position', 'Buffer (±0.2m)', 'Unblocked Anchor','Blocked Anchor');
 title('Moving Train Measurement with One Anchor Blocked');
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');

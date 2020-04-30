@@ -115,7 +115,7 @@ daspect([1 1 1]);
 grid on;
 l = legend([true_pos, measured_2, std_1, anch, anch_add, buff, block],...
     'True Position','Measured Position','Standard Deviation (Oval)',...
-    'Original Anchors', 'Added Anchor', 'Accuracy Buffer (±0.1m)', 'Blocakge');
+    'Original Anchors', 'Added Anchor', 'Accuracy Buffer (±0.1m)', 'Blockage');
 set(l, 'Location', 'north');
 title('Side Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor');
 xlabel('X coordinate (m)');
