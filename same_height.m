@@ -50,28 +50,28 @@ y_one_side_far_std = [0.043,  0.041,  0.042,  0.046,  0.030,  0.042,  0.070,  0.
 
 
 % Plotting with oval style standard deviation
-title_1 = "Square Anchor Geometry (Surrounding)";
+title_1 = 'Square Anchor Geometry (Surrounding)';
 pos_plot(X_TRUE, Y_TRUE, x_sqr, y_sqr, x_sqr_std, y_sqr_std,...
     x_anch_sqr, y_anch_sqr, BUFFER_POS, title_1);
-title_2 = "Triangle Anchor Geometry (Surrounding)";
+title_2 = 'Triangle Anchor Geometry (Surrounding)';
 pos_plot(X_TRUE, Y_TRUE, x_tri, y_tri, x_tri_std, y_tri_std,...
     x_anch_tri, y_anch_tri, BUFFER_POS, title_2);
-title_3 = "Single-Side Anchor Geometry, Smaller Anchor Spacing";
+title_3 = 'Single-Side Anchor Geometry, Smaller Anchor Spacing';
 pos_plot(X_TRUE, Y_TRUE, x_one_side, y_one_side, x_one_side_std, y_one_side_std,...
     x_anch_one_side, y_anch_one_side, BUFFER_POS, title_3);
-title_4 = "Single-Side Anchor Geometry, Larger Anchor Spacing";
+title_4 = 'Single-Side Anchor Geometry, Larger Anchor Spacing';
 pos_plot(X_TRUE, Y_TRUE, x_one_side_far, y_one_side_far, x_one_side_far_std,y_one_side_far_std,...
     x_anch_one_side_far, y_anch_one_side_far, BUFFER_POS, title_4);
 
 % Plotting with errorbar style
 pos_errorbar(X_TRUE, Y_TRUE, x_sqr, y_sqr, x_sqr_std, y_sqr_std,...
-    x_anch_sqr, y_anch_sqr, BUFFER_POS, "Square Anchor Geometry (Surrounding)");
+    x_anch_sqr, y_anch_sqr, BUFFER_POS, 'Square Anchor Geometry (Surrounding)');
 pos_errorbar(X_TRUE, Y_TRUE, x_tri, y_tri, x_tri_std, y_tri_std,...
-    x_anch_tri, y_anch_tri, BUFFER_POS, "Triangle Anchor Geometry (Surrounding)");
+    x_anch_tri, y_anch_tri, BUFFER_POS, 'Triangle Anchor Geometry (Surrounding)');
 pos_errorbar(X_TRUE, Y_TRUE, x_one_side, y_one_side, x_one_side_std, y_one_side_std,...
-    x_anch_one_side, y_anch_one_side, BUFFER_POS, "Single-Side Anchor Geometry, Smaller Anchor Spacing");
+    x_anch_one_side, y_anch_one_side, BUFFER_POS, 'Single-Side Anchor Geometry, Smaller Anchor Spacing');
 pos_errorbar(X_TRUE, Y_TRUE, x_one_side_far, y_one_side_far, x_one_side_far_std,y_one_side_far_std,...
-    x_anch_one_side_far, y_anch_one_side_far, BUFFER_POS, "Single-Side Anchor Geometry, Larger Anchor Spacing");
+    x_anch_one_side_far, y_anch_one_side_far, BUFFER_POS, 'Single-Side Anchor Geometry, Larger Anchor Spacing');
 
 
 function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
@@ -101,7 +101,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
 
     % Plot the connection from truth to measurements
     for i = 1:1:length(x_true)
-        quiver(x_true(i), y_true(i), x_measure(i)-x_true(i), y_measure(i)-y_true(i),'color','r');
+        quiver(x_true(i), y_true(i), x_measure(i)-x_true(i), y_measure(i)-y_true(i),'color','g','LineStyle','.-');
         hold on
     end
 
@@ -110,7 +110,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     % Plot the buffer (+-10cm) for decawave
     rectangle('Position', buffer_pos, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1);
     % Plot the true positions of tags
-    plot_true_pos = plot(x_true, y_true, 'r*');
+    plot_true_pos = plot(x_true, y_true, 'r*-');
     % Plot the measured positions of tags
     plot_measured = plot(x_measure, y_measure,'.b');
     axis([-0.5 3 -0.5 1.5]);
@@ -143,7 +143,7 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
     % replot in a zoomed-in manner
     rectangle('Position', buffer_pos, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1);
-    true_pos = plot(x_true, y_true, 'r*');
+    true_pos = plot(x_true, y_true, 'r-*');
     % Plot the connection from truth to measurements
     for i = 1:1:length(x_true)
         quiver(x_true(i), y_true(i), x_measure(i)-x_true(i), y_measure(i)-y_true(i),'color','r');
