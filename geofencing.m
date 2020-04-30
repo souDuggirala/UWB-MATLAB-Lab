@@ -71,7 +71,7 @@ l = legend([true_pos,measured_1,std_1,anch,buff, block],...
     'True Position','Measured Position','Standard Deviation (Oval)',...
     'Anchor', 'Accuracy Buffer (±0.1m)', 'Blockage');
 set(l, 'Location', 'north');
-title('Size Blockage NLOS Conditions, 5 Fixed Anchors');
+title('Side Blockage NLOS Conditions, 5 Fixed Anchors');
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');
 hold off;
@@ -117,7 +117,7 @@ l = legend([true_pos, measured_2, std_1, anch, anch_add, buff, block],...
     'True Position','Measured Position','Standard Deviation (Oval)',...
     'Original Anchors', 'Added Anchor', 'Accuracy Buffer (±0.1m)', 'Blocakge');
 set(l, 'Location', 'north');
-title('Size Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor');
+title('Side Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor');
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');
 hold off;
@@ -133,7 +133,7 @@ hold on;
 % Plot the dummy handles for legend
 buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
 % replot in a zoomed-in manner
-rectangle('Position',RECTANGLE_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1);
+rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1);
 true_pos = plot(X_TRUE,Y_TRUE,'r*');
 % Plot the connection from truth to measurements
 for i = 1:1:8
@@ -145,7 +145,7 @@ grid on;
 l = legend([true_pos,e1,buff],'True Position','Measured Position','Accuracy Buffer (±0.1m)');
 set(l, 'Location', 'northeast');
 axis([-0.5 2.5 1.2 1.7]);
-title('Size Blockage NLOS Conditions, 5 Fixed Anchors (Zoomed in)');
+title('Side Blockage NLOS Conditions, 5 Fixed Anchors (Zoomed in)');
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');
 hold off;
@@ -157,7 +157,7 @@ hold on;
 % Plot the dummy handles for legend
 buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
 % replot in a zoomed-in manner
-rectangle('Position',RECTANGLE_POS, 'LineStyle','--', 'EdgeColor','m','Curvature', 1);
+rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m','Curvature', 1);
 true_pos = plot(X_TRUE,Y_TRUE,'r*');
 % Plot the connection from truth to measurements
 for i = 1:1:8
@@ -169,7 +169,7 @@ grid on;
 l = legend([true_pos,e2,buff],'True Position','Measured Position','Accuracy Buffer (±0.1m)');
 set(l, 'Location', 'northeast');
 axis([-0.5 2.5 1.2 1.7]);
-title('Size Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor (Zoomed in)');
+title('Side Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor (Zoomed in)');
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');
 hold off;
