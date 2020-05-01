@@ -101,7 +101,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
 
     % Plot the connection from truth to measurements
     for i = 1:1:length(x_true)
-        quiver(x_true(i), y_true(i), x_measure(i)-x_true(i), y_measure(i)-y_true(i),'color','g','LineStyle','.-');
+        quiver(x_true(i), y_true(i), x_measure(i)-x_true(i), y_measure(i)-y_true(i),'color','k','LineStyle','-','LineWidth',1);
         hold on
     end
 
@@ -112,7 +112,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     % Plot the true positions of tags
     plot_true_pos = plot(x_true, y_true, 'r*-');
     % Plot the measured positions of tags
-    plot_measured = plot(x_measure, y_measure,'.b');
+    plot_measured = plot(x_measure, y_measure,'.b:');
     axis([-0.5 3 -0.5 1.5]);
     daspect([1 1 1]);
     grid on;
@@ -135,7 +135,7 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     figure();
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
     e1 = errorbar(x_measure, y_measure, y_std, y_std, x_std, x_std,...
-        'Marker','o');
+        'Marker','o','LineStyle',':');
     hold on;
     % Plot the anchor positions
     anch = plot(x_anch, y_anch, 'b^');
@@ -143,10 +143,10 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
     % replot in a zoomed-in manner
     rectangle('Position', buffer_pos, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1);
-    true_pos = plot(x_true, y_true, 'r-*');
+    true_pos = plot(x_true, y_true, 'r*-');
     % Plot the connection from truth to measurements
     for i = 1:1:length(x_true)
-        quiver(x_true(i), y_true(i), x_measure(i)-x_true(i), y_measure(i)-y_true(i),'color','r');
+        quiver(x_true(i), y_true(i), x_measure(i)-x_true(i), y_measure(i)-y_true(i),'color','k','LineStyle','-','LineWidth',1);
         hold on
     end
     daspect([1 1 1]);
