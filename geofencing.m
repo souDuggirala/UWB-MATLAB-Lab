@@ -33,7 +33,7 @@ set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
 hold on;
 % Plot the dummy handles for legend
 std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
-buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
+buff = plot(nan, nan, 'LineStyle','-.', 'Color',[.61 .51 .74]); % makes purple;
 block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
 
 % Plot the std. deviation for all data points of geo1
@@ -51,19 +51,19 @@ end
 
 % Plot the connection from truth to measurements
 for i = 1:1:8
-    quiver(X_TRUE(i), Y_TRUE(i), x_geo1(i)-X_TRUE(i), y_geo1(i)-Y_TRUE(i),'color','k','LineStyle','-','LineWidth',1);
+    quiver(X_TRUE(i), Y_TRUE(i), x_geo1(i)-X_TRUE(i), y_geo1(i)-Y_TRUE(i),'color','k','LineStyle',':','LineWidth',0.3);
     hold on
 end
 % Plot the anchor positions
 anch = plot(x_anch,y_anch,'b^');
 % Plot the buffer (+-10cm) for decawave
-rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1);
+rectangle('Position',BUFFER_POS, 'LineStyle',':', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
 % Plot the blockage
-rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2);
+rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
 % Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r*-');
+true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
 % Plot the measured positions of tags
-measured_1 = plot(x_geo1,y_geo1,'.b:');
+measured_1 = plot(x_geo1,y_geo1,'b-','LineWidth',2);
 axis([-0.5 2.5 -0.5 3]);
 daspect([1 1 1]);
 grid on;
@@ -81,7 +81,7 @@ subplot(1,2,2);
 hold on;
 % Plot the dummy handles for legend
 std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
-buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
+buff = plot(nan, nan, 'LineStyle','-.', 'Color',[.61 .51 .74]); % makes purple;
 block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
 %Plot the std. deviation for all data points of geo2
 for i = 1:1:8
@@ -97,19 +97,19 @@ for i = 1:1:8
 end
 % Plot the connection from truth to measurements
 for i = 1:1:8
-    quiver(X_TRUE(i), Y_TRUE(i), x_geo2(i)-X_TRUE(i), y_geo2(i)-Y_TRUE(i),'color','k','LineStyle','-','LineWidth',1);
+    quiver(X_TRUE(i), Y_TRUE(i), x_geo2(i)-X_TRUE(i), y_geo2(i)-Y_TRUE(i),'color','k','LineStyle',':','LineWidth',0.3);
     hold on
 end
 anch = plot(x_anch,y_anch,'b^');
 anch_add = plot(x_anch_addition, y_anch_addition,'r^');
 % Plot the buffer (+-10cm) for decawave
-rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1);
+rectangle('Position',BUFFER_POS, 'LineStyle',':', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
 % Plot the blockage
-rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2);
+rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
 % Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r*-');
+true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
 % Plot the measured positions of tags
-measured_2 = plot(x_geo2,y_geo2,'.b:');
+measured_2 = plot(x_geo2,y_geo2,'b-','LineWidth',2);
 axis([-0.5 2.5 -0.5 3]);
 daspect([1 1 1]);
 grid on;
@@ -128,16 +128,16 @@ figure(2);
 subplot(2,1,1);
 set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
 e1 = errorbar(x_geo1, y_geo1, y_geo1_std, y_geo1_std, x_geo1_std, x_geo1_std,...
-    'Marker','o','LineStyle',':');
+    'Marker','o','LineStyle','-','LineWidth',2);
 hold on;
 % Plot the dummy handles for legend
 buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
 % replot in a zoomed-in manner
-rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1);
-true_pos = plot(X_TRUE,Y_TRUE,'r*-');
+rectangle('Position',BUFFER_POS, 'LineStyle',':', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
+true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
 % Plot the connection from truth to measurements
 for i = 1:1:8
-    quiver(X_TRUE(i), Y_TRUE(i), x_geo1(i)-X_TRUE(i), y_geo1(i)-Y_TRUE(i),'color','k','LineStyle','-','LineWidth',1);
+    quiver(X_TRUE(i), Y_TRUE(i), x_geo1(i)-X_TRUE(i), y_geo1(i)-Y_TRUE(i),'LineStyle',':','LineWidth',0.3,'Color','k');
     hold on
 end
 daspect([1 1 1]);
@@ -152,16 +152,16 @@ hold off;
 
 subplot(2,1,2);
 e2 = errorbar(x_geo2, y_geo2, y_geo2_std, y_geo2_std, x_geo2_std, x_geo2_std,...
-    'Marker','o','LineStyle',':');
+    'Marker','o','LineStyle','-','LineWidth',2);
 hold on;
 % Plot the dummy handles for legend
 buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
 % replot in a zoomed-in manner
-rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m','Curvature', 1);
-true_pos = plot(X_TRUE,Y_TRUE,'r*-');
+rectangle('Position',BUFFER_POS, 'LineStyle',':', 'EdgeColor','m','Curvature', 1);
+true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
 % Plot the connection from truth to measurements
 for i = 1:1:8
-    quiver(X_TRUE(i), Y_TRUE(i), x_geo2(i)-X_TRUE(i), y_geo2(i)-Y_TRUE(i),'color','k','LineStyle','-','LineWidth',1);
+    quiver(X_TRUE(i), Y_TRUE(i), x_geo2(i)-X_TRUE(i), y_geo2(i)-Y_TRUE(i),'color','k','LineStyle',':','LineWidth',0.3);
     hold on
 end
 daspect([1 1 1]);
