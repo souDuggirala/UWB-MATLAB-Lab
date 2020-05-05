@@ -66,7 +66,7 @@ rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature',
 % Plot the blockage
 rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
 % Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
 % Plot the measured positions of tags
 measured_1 = plot(x_geo1,y_geo1,'b-','LineWidth',2);
 axis([-0.5 2.5 -0.5 3]);
@@ -112,7 +112,7 @@ rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature',
 % Plot the blockage
 rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
 % Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
 % Plot the measured positions of tags
 measured_2 = plot(x_geo2,y_geo2,'b-','LineWidth',2);
 axis([-0.5 2.5 -0.5 3]);
@@ -139,7 +139,7 @@ hold on;
 buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
 % replot in a zoomed-in manner
 rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
-true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
 % Plot the connection from truth to measurements
 for i = 1:1:8
     quiver(X_TRUE(i), Y_TRUE(i), x_geo1(i)-X_TRUE(i), y_geo1(i)-Y_TRUE(i),'LineStyle',':','LineWidth',0.3,'Color','k');
@@ -163,7 +163,7 @@ hold on;
 buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
 % replot in a zoomed-in manner
 rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m','Curvature', 1);
-true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
 % Plot the connection from truth to measurements
 for i = 1:1:8
     quiver(X_TRUE(i), Y_TRUE(i), x_geo2(i)-X_TRUE(i), y_geo2(i)-Y_TRUE(i),'color','k','LineStyle',':','LineWidth',0.3);
