@@ -1,13 +1,22 @@
 % Always put data/constants at first, even thought they are hard coded. 
 % ------------ Data input ------------
 % Ground truth
+ACCURACY_BUFFER = 0.1;
+ACCURACY_SCALE = 1/20;
 X_TRUE = [0,      0.25,   0.5,    0.75,   1,      1.25,   1.5,    1.75];
 Y_TRUE = [1.4,    1.4,    1.4,    1.4,    1.4,    1.4,    1.4,    1.4,];
+<<<<<<< HEAD
 
 OFFSET=1.4;
 
 
 BUFFER_POS = [-0.10, 1.3, 1.95, 0.2];
+=======
+BUFFER_POS = [0-ACCURACY_BUFFER*ACCURACY_SCALE, ...
+    1.4-ACCURACY_BUFFER*ACCURACY_SCALE, ...
+    0-ACCURACY_BUFFER*ACCURACY_SCALE+1.75+ACCURACY_BUFFER*ACCURACY_SCALE*3, ...
+    2*ACCURACY_BUFFER*ACCURACY_SCALE];
+>>>>>>> 0766c87c72d7097cad44e75a34caa3ee46c666be
 BLOCKAGE_POS = [0.7, 0.65, 0.6, 0.02];
 
 % Anchor position for geo_1
@@ -76,11 +85,11 @@ end
 % Plot the anchor positions
 anch = plot(x_anch,y_anch,'b^');
 % Plot the buffer (+-10cm) for decawave
-rectangle('Position',BUFFER_POS, 'LineStyle',':', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
+rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
 % Plot the blockage
 rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
 % Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
 % Plot the measured positions of tags
 measured_1 = plot(x_geo1,y_geo1,'b-','LineWidth',2);
 axis([-0.5 2.5 -0.5 3]);
@@ -122,11 +131,11 @@ end
 anch = plot(x_anch,y_anch,'b^');
 anch_add = plot(x_anch_addition, y_anch_addition,'r^');
 % Plot the buffer (+-10cm) for decawave
-rectangle('Position',BUFFER_POS, 'LineStyle',':', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
+rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
 % Plot the blockage
 rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
 % Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
 % Plot the measured positions of tags
 measured_2 = plot(x_geo2,y_geo2,'b-','LineWidth',2);
 axis([-0.5 2.5 -0.5 3]);
@@ -152,8 +161,8 @@ hold on;
 % Plot the dummy handles for legend
 buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
 % replot in a zoomed-in manner
-rectangle('Position',BUFFER_POS, 'LineStyle',':', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
-true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
+true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
 % Plot the connection from truth to measurements
 for i = 1:1:8
     quiver(X_TRUE(i), Y_TRUE(i), x_geo1(i)-X_TRUE(i), y_geo1(i)-Y_TRUE(i),'LineStyle',':','LineWidth',0.3,'Color','k');
@@ -176,8 +185,8 @@ hold on;
 % Plot the dummy handles for legend
 buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
 % replot in a zoomed-in manner
-rectangle('Position',BUFFER_POS, 'LineStyle',':', 'EdgeColor','m','Curvature', 1);
-true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m','Curvature', 1);
+true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
 % Plot the connection from truth to measurements
 for i = 1:1:8
     quiver(X_TRUE(i), Y_TRUE(i), x_geo2(i)-X_TRUE(i), y_geo2(i)-Y_TRUE(i),'color','k','LineStyle',':','LineWidth',0.3);
