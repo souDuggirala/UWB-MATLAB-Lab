@@ -3,6 +3,10 @@
 % Ground truth
 X_TRUE = [0,      0.25,   0.5,    0.75,   1,      1.25,   1.5,    1.75];
 Y_TRUE = [1.4,    1.4,    1.4,    1.4,    1.4,    1.4,    1.4,    1.4,];
+
+OFFSET=1.4;
+
+
 BUFFER_POS = [-0.10, 1.3, 1.95, 0.2];
 BLOCKAGE_POS = [0.7, 0.65, 0.6, 0.02];
 
@@ -19,11 +23,26 @@ y_geo1 = [1.344,  1.412,  1.416,  1.552,  1.491,  1.576,  1.59,   1.56];
 x_geo1_std = [0.087,  0.038,  0.038,  0.030,  0.026,  0.018,  0.025,  0.029];
 y_geo1_std = [0.028,  0.017,  0.017,  0.021,  0.015,  0.010,  0.014,  0.013];
 
+%Calculate the scaled value for geo_1
+for i=1:8
+    
+    
+    y_geo1_scaled(i)=abs(Y_TRUE(i)-y_geo1(i))/8.3+OFFSET;
+end
+
+
 %6 anchors, one additional to compensate the blocking vehicle
 x_geo2 = [0.061,  0.432,  0.653,  0.946,  1.064,  1.296,  1.656,  1.75];
 y_geo2 = [1.47,   1.47,   1.41,   1.434,  1.418,  1.490,  1.510,  1.513];
 x_geo2_std = [0.028,  0.041,  0.047,  0.036,  0.019,  0.037,  0.028,  0.025];
 y_geo2_std = [0.015,  0.021,  0.028,  0.026,  0.013,  0.014,  0.013,  0.012];
+
+%Calculate the scaled value for geo_2
+for i=1:8
+    
+   
+    y_geo2_scaled(i)=abs(Y_TRUE(i)-y_geo2(i))/8.3 +OFFSET;
+end
 
 % ------------ Plotting ------------
 % Experiment 1, 5 anchors
@@ -173,4 +192,74 @@ title('Side Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor (Zoo
 xlabel('X coordinate (m)');
 ylabel('Y coordinate (m)');
 hold off;
+
+%Plot scaled values
+figure(3);
+subplot(1,2,1);
+set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
+hold on;
+% Plot the dummy handles for legend
+std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
+buff = plot(nan, nan, 'LineStyle','-.', 'Color',[.61 .51 .74]); % makes purple;
+block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
+
+
+% Plot the anchor positions
+anch = plot(x_anch,y_anch,'b^');
+% Plot the buffer (+-10cm) for decawave
+%rectangle('Position',BUFFER_POS_SCALED, 'LineStyle',':', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
+% Plot the blockage
+rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
+% Plot the true positions of tags
+true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+% Plot the measured positions of tags
+measured_1 = plot(x_geo1,y_geo1_scaled,'b-','LineWidth',2);
+axis([-0.5 2.5 -0.5 3]);
+daspect([1 1 1]);
+grid on;
+l = legend([true_pos,measured_1,std_1,anch,buff, block],...
+    'True Position','Measured Position','Standard Deviation (Oval)',...
+    'Anchor', 'Accuracy Buffer (±0.1m)', 'Blockage');
+set(l, 'Location', 'north');
+title('Side Blockage NLOS Conditions, 5 Fixed Anchors');
+xlabel('X coordinate (m)');
+ylabel('Y coordinate (m)');
+hold off;
+
+
+subplot(1,2,2);
+hold on;
+% Plot the dummy handles for legend
+std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
+buff = plot(nan, nan, 'LineStyle','-.', 'Color',[.61 .51 .74]); % makes purple;
+block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
+%Plot the std. deviation for all data points of geo2
+
+anch = plot(x_anch,y_anch,'b^');
+anch_add = plot(x_anch_addition, y_anch_addition,'r^');
+% Plot the buffer (+-10cm) for decawave
+%rectangle('Position',BUFFER_POS_SCALED, 'LineStyle',':', 'EdgeColor','m', 'Curvature', 1,'LineWidth',0.3);
+% Plot the blockage
+rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
+% Plot the true positions of tags
+true_pos = plot(X_TRUE,Y_TRUE,'r.-','LineWidth',1);
+% Plot the measured positions of tags
+measured_2 = plot(x_geo2,y_geo2_scaled,'b-','LineWidth',2);
+axis([-0.5 2.5 -0.5 3]);
+daspect([1 1 1]);
+grid on;
+l = legend([true_pos, measured_2, std_1, anch, anch_add, buff, block],...
+    'True Position','Measured Position','Standard Deviation (Oval)',...
+    'Original Anchors', 'Added Anchor', 'Accuracy Buffer (±0.1m)', 'Blockage');
+set(l, 'Location', 'north');
+title('Side Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor');
+xlabel('X coordinate (m)');
+ylabel('Y coordinate (m)');
+hold off;
+
+
+
+
+
+
 
