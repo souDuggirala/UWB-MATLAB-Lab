@@ -147,7 +147,7 @@ ylabel('Y coordinate (m)');
 hold off;
 
 function [x_tag_pos_avg,y_tag_pos_avg,x_tag_pos_std,y_tag_pos_std]=getData(name)
-    % %Anchor Positions  for height exp
+    % %Anchor Positions for geofencing exp
     disp(name)
     cd (name)
     dinfo = dir('pos*.txt');
@@ -173,24 +173,20 @@ function [x_tag_pos_avg,y_tag_pos_avg,x_tag_pos_std,y_tag_pos_std]=getData(name)
 cd ..
 end
 
+% This function clean the Raw data obtained from the UBW devices. 
+% Here we are reading the file line by line.
+% Lines with "POS" along with postion data are removed and other lines are writtern into temp file.
+
 function cleanData(filename)
 disp(filename)
 fid = fopen(filename);
 fid1 = fopen('temp.txt','wt');
-% Can you please explain the use of regexp here and its purpose? 
-% I am not too familiar with the use of regexp in general.
-% -- Zezhou 0608
+% regexp is used with match feature to detect lines with "POS" 
+% in some files there are lines with POS in b/w data which create issue while processing   
 while ~feof(fid)
     tline = fgetl(fid);
     expression = '[^\n]*POS[^\n]*';
-% I need some help understanding the purpose of 'POS' here. E.g. some
-% examples of matching cases? Thank you very much! (sorry for not being 
-% trained in regexp before)
-% -- Zezhou 0608
     matches = regexp(tline,expression,'match');
-% What is the case of matching? I ran the code and printed nothing matching 
-% but all not matching. Is it just to print an additional /n sign for each line?
-% -- Zezhou 0608
     if (isempty(matches ))
         fwrite(fid1,tline);
         fprintf(fid1,'\n');
@@ -257,21 +253,21 @@ if isErrorBar
     if ~hasRelayingAnchors
         l = legend([true_pos,e,anch,buff,block],...
         'True Position','Measured Position',...
-        'Fixed Anchors', 'Accuracy Buffer (±0.1m)', 'Blockage');
+        'Fixed Anchors', 'Accuracy Buffer (Â±0.1m)', 'Blockage');
     else
         l = legend([true_pos,e,anch,anch_add,buff,block],...
         'True Position','Measured Position',...
-        'Fixed Anchors', 'Relaying Anchor(s)', 'Accuracy Buffer (±0.1m)',...
+        'Fixed Anchors', 'Relaying Anchor(s)', 'Accuracy Buffer (Â±0.1m)',...
         'Blockage');
     end
 else
     if ~hasRelayingAnchors
         l = legend([true_pos,measured,buff,anch,block],...
-        'True Position','Measured Position','Accuracy Buffer (±0.1m)',...
+        'True Position','Measured Position','Accuracy Buffer (Â±0.1m)',...
         'Fixed Anchors', 'Blockage');
     else
         l = legend([true_pos,measured,buff,anch,anch_add,block],...
-        'True Position','Measured Position','Accuracy Buffer (±0.1m)',...
+        'True Position','Measured Position','Accuracy Buffer (Â±0.1m)',...
         'Fixed Anchors', 'Relaying Anchor(s)','Blockage');
     end
 end
