@@ -54,7 +54,7 @@ X_ANCH_ADDITIONAL = [1];
 Y_ANCH_ADDITIONAL = [0.7];
 
 % ------------ Plotting Raw ------------
-figure(1);
+figure();
 set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
 subplot(1,2,1);
 % Experiment 1, 5 anchors
@@ -62,13 +62,13 @@ plotData(gca, x_exp1, y_exp1, x_exp1_std, y_exp1_std, X_TRUE, Y_TRUE,...
     false, 'Side Blockage NLOS Conditions, 5 Fixed Anchors',...
     'north', true, [-0.5 2.5 -0.5 3]);
 subplot(1,2,2);
-% % Experiment 2, 6 anchors
+% Experiment 2, 6 anchors
 plotData(gca, x_exp2, y_exp2, x_exp2_std, y_exp2_std, X_TRUE, Y_TRUE,...
     true, 'Side Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor',...
     'north', true, [-0.5 2.5 -0.5 3]);
 
 % ------------ Plotting Zoomed ------------
-figure(2)
+figure()
 subplot(2,1,1);
 set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
 % Experiment 1, 5 anchors, zoomed in
@@ -82,72 +82,25 @@ plotData(gca, x_exp2, y_exp2, x_exp2_std, y_exp2_std, X_TRUE, Y_TRUE,...
     'northeast', true, [-0.5 2.5 1.2 1.7]);
 
 % ------------ Plotting Scaled ------------
-figure(3);
+% Y-axis deviation is scaled, X-axis devaition is not scaled
+x_scale = 20;
+y_scale = 8;
+figure();
 set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
 subplot(1,2,1);
-% TODO: refactor this scaled plotting into the function plotData, instead
-% of plotting in main() 
-% 0608 --Zezhou
-
-
-% ------------ Plotting ------------
-% Plot scaled values for experiment 1, no zoom in, no buffer zone
-figure(3);
-subplot(1,2,1);
-set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
-hold on;
-% Plot the dummy handles for legend
-block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
-% Plot the anchor positions
-anch = plot(X_ANCH,Y_ANCH,'b^');
-% Plot the blockage
-rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
-% Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
-% Plot the measured positions of tags
-scaled_1 = plot(x_exp1,y_exp1_scaled_delta,'b.-.','LineWidth',1);
-axis([-0.5 2.5 -0.5 3]);
-daspect([1 1 1]);
-grid on;
-l = legend([true_pos,scaled_1,anch, block],...
-    'True Position','Measured Position (Scaled Y)',...
-    'Anchor', 'Blockage');
-set(l, 'Location', 'north');
-title('Side Blockage NLOS Conditions, 5 Fixed Anchors, Scaled Y');
-xlabel('X coordinate (m)');
-ylabel('Y coordinate (m)');
-hold off;
-
-% ------------ Plotting ------------
-% Plot scaled values for experiment 2, no zoom in, no buffer zone
+% Experiment 1, 5 anchors
+plotDataScaled(gca, x_exp1, y_exp1_scaled_delta, X_TRUE, Y_TRUE, x_scale, y_scale, ...
+    false, 'Side Blockage NLOS Conditions, 5 Fixed Anchors (Scaled)',...
+    'north', [-0.5 2.5 -0.5 3]);
+% Experiment 2, 6 anchors
 subplot(1,2,2);
-set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
-hold on;
-% Plot the dummy handles for legend
-block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
-% Plot the additional anchor
-anch = plot(X_ANCH,Y_ANCH,'b^');
-anch_add = plot(X_ANCH_ADDITIONAL, Y_ANCH_ADDITIONAL,'r^');
-% Plot the blockage
-rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
-% Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
-% Plot the measured positions of tags
-scaled_2 = plot(x_exp2,y_exp2_scaled_delta,'b.-.','LineWidth',1);
-axis([-0.5 2.5 -0.5 3]);
-daspect([1 1 1]);
-grid on;
-l = legend([true_pos, scaled_2, anch, anch_add, block],...
-    'True Position','Measured Position (Scaled Y)',...
-    'Original Anchors', 'Added Anchor', 'Blockage');
-set(l, 'Location', 'north');
-title('Side Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor, Scaled Y');
-xlabel('X coordinate (m)');
-ylabel('Y coordinate (m)');
-hold off;
+plotDataScaled(gca, x_exp2, y_exp2_scaled_delta, X_TRUE, Y_TRUE, x_scale, y_scale, ...
+    true, 'Side Blockage NLOS Conditions, 5 Fixed Anchors and 1 Relaying Anchor (Scaled)',...
+    'north', [-0.5 2.5 -0.5 3]);
+
 
 function [x_tag_pos_avg,y_tag_pos_avg,x_tag_pos_std,y_tag_pos_std]=getData(name)
-    % %Anchor Positions for geofencing exp
+    % Anchor positions for geofencing exp
     disp(name)
     cd (name)
     dinfo = dir('pos*.txt');
@@ -173,107 +126,167 @@ function [x_tag_pos_avg,y_tag_pos_avg,x_tag_pos_std,y_tag_pos_std]=getData(name)
 cd ..
 end
 
-% This function clean the Raw data obtained from the UBW devices. 
+% This function cleans the raw data obtained from the UWB devices. 
 % Here we are reading the file line by line.
-% Lines with "POS" along with postion data are removed and other lines are writtern into temp file.
-
+% Lines with "POS" along with postion data are removed and other lines are 
+% writtern into temp file.
 function cleanData(filename)
-disp(filename)
-fid = fopen(filename);
-fid1 = fopen('temp.txt','wt');
-% regexp is used with match feature to detect lines with "POS" 
-% in some files there are lines with POS in b/w data which create issue while processing   
-while ~feof(fid)
-    tline = fgetl(fid);
-    expression = '[^\n]*POS[^\n]*';
-    matches = regexp(tline,expression,'match');
-    if (isempty(matches ))
-        fwrite(fid1,tline);
-        fprintf(fid1,'\n');
+    disp(filename)
+    fid = fopen(filename);
+    fid1 = fopen('temp.txt','wt');
+    % regexp is used with match feature to detect lines with "POS" 
+    % in some files there are lines with POS in b/w data which create issue 
+    % while processing   
+    while ~feof(fid)
+        tline = fgetl(fid);
+        expression = '[^\n]*POS[^\n]*';
+        matches = regexp(tline,expression,'match');
+        if (isempty(matches ))
+            fwrite(fid1,tline);
+            fprintf(fid1,'\n');
+        end
     end
-end
-fclose(fid);
-fclose(fid1); 
+    fclose(fid);
+    fclose(fid1); 
 end
 
+% This function plots the measurement data without scaling ratio. 
+% Options: 
+% hasRelayingAnchors: true/false - if plots the relaying anchor
+% isErrorBar: true/false - if plots the standard deviation in errorbar
+%   style or oval style
+% axisLimitsArray: 4-element array showing X-Y axis limits
 function plotData(ax, xTag, yTag, xTagStd, yTagStd, X_TRUE, Y_TRUE,...
-    hasRelayingAnchors, plotTitle, legendPos, isErrorBar, zoomFactors)
-% ------------ Plotting ------------
-hold on;
-% Plot the std. deviation for all data points
-if isErrorBar
-    e = errorbar(xTag, yTag, yTagStd, yTagStd, xTagStd, xTagStd,...
-        'Marker','o','LineStyle','-','LineWidth',1, 'Color', 'b');
-else
-    std = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
+    hasRelayingAnchors, plotTitle, legendPos, isErrorBar, axisLimitsArray)
+    % ------------ Plotting ------------
+    hold on;
+    % Plot the std. deviation for all data points
+    if isErrorBar
+        e = errorbar(xTag, yTag, yTagStd, yTagStd, xTagStd, xTagStd,...
+            'Marker','o','LineStyle','-','LineWidth',1, 'Color', 'b');
+    else
+        std = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
+        for i = 1:1:length(xTag)
+            theta = 0 : 0.01 : 2*pi;
+            xcenter = xTag(i);
+            ycenter = yTag(i);
+            xradius = xTagStd(i);
+            yradius = yTagStd(i);
+            x_s = xradius * cos(theta) + xcenter;
+            y_s = yradius * sin(theta) + ycenter;
+            h = fill(x_s,y_s,'b','facealpha',0.3);
+            hold on
+        end
+    end
+    % Plot the dummy handles for the legend
+    buff = plot(nan, nan, 'LineStyle','-.', 'Color',[.61 .51 .74]); % purple
+    block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
+
+    % Plot the connection from truth to measurements
     for i = 1:1:length(xTag)
-        theta = 0 : 0.01 : 2*pi;
-        xcenter = xTag(i);
-        ycenter = yTag(i);
-        xradius = xTagStd(i);
-        yradius = yTagStd(i);
-        x_s = xradius * cos(theta) + xcenter;
-        y_s = yradius * sin(theta) + ycenter;
-        h = fill(x_s,y_s,'b','facealpha',0.3);
+        quiver(X_TRUE(i), Y_TRUE(i), xTag(i)-X_TRUE(i), yTag(i)-Y_TRUE(i),...
+            'color','k','LineStyle',':','LineWidth',0.3);
         hold on
     end
-end
-
-% Plot the dummy handles for the legend
-buff = plot(nan, nan, 'LineStyle','-.', 'Color',[.61 .51 .74]); % purple
-block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
-
-% Plot the connection from truth to measurements
-for i = 1:1:length(xTag)
-    quiver(X_TRUE(i), Y_TRUE(i), xTag(i)-X_TRUE(i), yTag(i)-Y_TRUE(i),...
-        'color','k','LineStyle',':','LineWidth',0.3);
-    hold on
-end
-global X_ANCH Y_ANCH BUFFER_POS BLOCKAGE_POS X_ANCH_ADDITIONAL Y_ANCH_ADDITIONAL
-% Plot the anchor positions
-anch = plot(X_ANCH,Y_ANCH,'b^');
-if hasRelayingAnchors
-    % Plot the added relaying anchor
-    anch_add = plot(X_ANCH_ADDITIONAL, Y_ANCH_ADDITIONAL,'r^');
-end
-% Plot the buffer (+-10cm) for decawave
-rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', ...
-    'Curvature', 1,'LineWidth',0.3);
-% Plot the blockage
-rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', ...
-    'Curvature', 0.2,'LineWidth',0.3);
-% Plot the true positions of tags
-true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
-% Plot the measured positions of tags
-measured = plot(xTag,yTag,'b.-.','LineWidth',1);
-axis(zoomFactors);
-daspect([1 1 1]);
-grid on;
-if isErrorBar
-    if ~hasRelayingAnchors
-        l = legend([true_pos,e,anch,buff,block],...
-        'True Position','Measured Position',...
-        'Fixed Anchors', 'Accuracy Buffer (±0.1m)', 'Blockage');
-    else
-        l = legend([true_pos,e,anch,anch_add,buff,block],...
-        'True Position','Measured Position',...
-        'Fixed Anchors', 'Relaying Anchor(s)', 'Accuracy Buffer (±0.1m)',...
-        'Blockage');
+    global X_ANCH Y_ANCH BUFFER_POS BLOCKAGE_POS X_ANCH_ADDITIONAL Y_ANCH_ADDITIONAL
+    % Plot the anchor positions
+    anch = plot(X_ANCH,Y_ANCH,'b^');
+    if hasRelayingAnchors
+        % Plot the added relaying anchor
+        anch_add = plot(X_ANCH_ADDITIONAL, Y_ANCH_ADDITIONAL,'r^');
     end
-else
+    % Plot the buffer (+-10cm) for decawave
+    rectangle('Position',BUFFER_POS, 'LineStyle','--', 'EdgeColor','m', ...
+        'Curvature', 1,'LineWidth',0.3);
+    % Plot the blockage
+    rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', ...
+        'Curvature', 0.2,'LineWidth',0.3);
+    % Plot the true positions of tags
+    true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
+    % Plot the measured positions of tags
+    measured = plot(xTag,yTag,'b.-.','LineWidth',1);
+    axis(axisLimitsArray);
+    daspect([1 1 1]);
+    grid on;
+    if isErrorBar
+        if ~hasRelayingAnchors
+            l = legend([true_pos,e,anch,buff,block],...
+            'True Position','Measured Position',...
+            'Fixed Anchors', 'Accuracy Buffer(0.1m)', 'Blockage');
+        else
+            l = legend([true_pos,e,anch,anch_add,buff,block],...
+            'True Position','Measured Position',...
+            'Fixed Anchors', 'Relaying Anchor(s)', 'Accuracy Buffer(0.1m)',...
+            'Blockage');
+        end
+    else
+        if ~hasRelayingAnchors
+            l = legend([true_pos,measured,buff,anch,block],...
+            'True Position','Measured Position','Accuracy Buffer(0.1m)',...
+            'Fixed Anchors', 'Blockage');
+        else
+            l = legend([true_pos,measured,buff,anch,anch_add,block],...
+            'True Position','Measured Position','Accuracy Buffer(0.1m)',...
+            'Fixed Anchors', 'Relaying Anchor(s)','Blockage');
+        end
+    end
+    set(l, 'Location', legendPos);
+    title(plotTitle);
+    xlabel('X coordinate (m)');
+    ylabel('Y coordinate (m)');
+    hold off;
+end
+
+% This function plots the measurement data with scaling ratio.
+% Options: 
+% hasRelayingAnchors: true/false - if plots the relaying anchor
+% isErrorBar: true/false - if plots the standard deviation in errorbar
+%   style or oval style
+% axisLimitsArray: 4-element array showing X-Y axis limits
+function plotDataScaled(ax, xTag, yTag, X_TRUE, Y_TRUE, x_scale, y_scale,...
+    hasRelayingAnchors, plotTitle, legendPos, axisLimitsArray)
+    % ------------ Plotting ------------
+    hold on;
+    % Plot the dummy handles for the legend
+    block = plot(nan, nan, 'ks', 'MarkerFaceColor','k');
+    % Plot the connection from truth to measurements
+    for i = 1:1:length(xTag)
+        quiver(X_TRUE(i), Y_TRUE(i), xTag(i)-X_TRUE(i), yTag(i)-Y_TRUE(i),...
+            'color','k','LineStyle',':','LineWidth',0.3);
+        hold on
+    end
+    global X_ANCH Y_ANCH BUFFER_POS BLOCKAGE_POS X_ANCH_ADDITIONAL Y_ANCH_ADDITIONAL
+    % Plot the anchor positions
+    anch = plot(X_ANCH,Y_ANCH,'b^');
+    if hasRelayingAnchors
+        % Plot the added relaying anchor
+        anch_add = plot(X_ANCH_ADDITIONAL, Y_ANCH_ADDITIONAL,'r^');
+    end
+    % Plot the blockage
+    rectangle('Position',BLOCKAGE_POS, 'EdgeColor','k', 'FaceColor', 'k', ...
+        'Curvature', 0.2,'LineWidth',0.3);
+    % Plot the true positions of tags
+    true_pos = plot(X_TRUE,Y_TRUE,'r*-','LineWidth',1);
+    % Plot the measured positions of tags
+    measured = plot(xTag,yTag,'b.-','LineWidth',1);
+    axis(axisLimitsArray);
+    daspect([1 1 1]);
+    grid on;
     if ~hasRelayingAnchors
-        l = legend([true_pos,measured,buff,anch,block],...
-        'True Position','Measured Position','Accuracy Buffer (±0.1m)',...
+        l = legend([true_pos,measured,anch,block],...
+        'True Position','Measured Position (Delta-Y Scaled)',...
         'Fixed Anchors', 'Blockage');
     else
-        l = legend([true_pos,measured,buff,anch,anch_add,block],...
-        'True Position','Measured Position','Accuracy Buffer (±0.1m)',...
+        l = legend([true_pos,measured,anch,anch_add,block],...
+        'True Position','Measured Position (Delta-Y Scaled)',...
         'Fixed Anchors', 'Relaying Anchor(s)','Blockage');
     end
-end
-set(l, 'Location', legendPos);
-title(plotTitle);
-xlabel('X coordinate (m)');
-ylabel('Y coordinate (m)');
-hold off;
+    set(l, 'Location', legendPos);
+    title(plotTitle);
+    xlabel('X coordinate (m)');
+    ylabel('Y coordinate (m)');
+    xt=arrayfun(@num2str,get(gca,'xtick')*x_scale,'un',0);
+    yt=arrayfun(@num2str,get(gca,'ytick')*y_scale,'un',0);
+    set(gca,'xticklabel',xt,'yticklabel',yt);
+    hold off;
 end
