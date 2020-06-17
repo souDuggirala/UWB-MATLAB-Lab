@@ -35,6 +35,9 @@ GeoExp('SingleSideOneAnchorBack',x_anch_one_side,y_anch_one_side,X_TRUE,Y_TRUE,B
 GeoExp('SingleSideTwoAnchorBack',x_anch_one_side_far,y_anch_one_side_far,X_TRUE,Y_TRUE,BUFFER_POS);
 GeoExp('TwoAnchorBlocked',x_anch_exp4,y_anch_exp4,X_TRUE,Y_TRUE,BUFFER_POS);
 GeoExp('TwoAnchorBlockedOneAdded',x_anch_exp4_geo2,y_anch_exp4_geo2,X_TRUE,Y_TRUE,BUFFER_POS);
+GeoExp('SquareTopology2',x_anch_height,y_anch_height,X_TRUE,Y_TRUE,BUFFER_POS);
+GeoExp('TagElevated2',x_anch_height,y_anch_height,X_TRUE,Y_TRUE,BUFFER_POS);
+GeoExp('TagAndAnchorElevated',x_anch_height,y_anch_height,X_TRUE,Y_TRUE,BUFFER_POS);
 
 
 function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true,buffer_pos)
