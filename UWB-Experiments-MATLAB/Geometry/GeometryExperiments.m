@@ -46,6 +46,7 @@ GeoExp('AllAnchorsElevated2',x_anch_height,y_anch_height,X_TRUE,Y_TRUE);
 
 function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     % %Anchor Positions  for height exp
+    cleanup = onCleanup(@()myCleanup());
     cd (name)
     dinfo = dir('pos*.txt');
     filenames = {dinfo.name};
@@ -72,7 +73,6 @@ pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_s
     x_anch_pos, y_anch_pos, name);
 pos_errorbar(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
     x_anch_pos, y_anch_pos, name);
-cd ..
 end
 
 
@@ -190,4 +190,10 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
     
+end
+
+function myCleanup()
+disp('Close Files');
+fclose('all');
+cd ..
 end
