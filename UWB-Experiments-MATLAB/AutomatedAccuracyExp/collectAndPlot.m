@@ -30,16 +30,19 @@ function FetchAndPlot()
     disp(y_true);
     disp(x_anch_pos);
     disp(y_anch_pos)
-    WritePosFile(postions);
+    WritePosFile(postions,expName);
     GeoExp(expName,x_anch_pos,y_anch_pos,x_true,y_true);
 
 end
 
-function WritePosFile(postions)
+function WritePosFile(postions,expName)
     %postions = input("Enter the number of postions ");
     serialPort = input("Enter the serial port ",'s');
     cleanup = onCleanup(@()myCleanup(serialPort));
     s=serialport(serialPort,115200);
+    newDir = expName;
+    mkdir newDir
+    cd newDir
     for i = linspace(1,postions,1)
        fileName="pos"+string(i)+".txt";
        tStart=tic;%starts the timer
@@ -63,6 +66,7 @@ function WritePosFile(postions)
         end
     end
     fclose("all");
+    cd ..
 end
 
 
@@ -71,7 +75,6 @@ end
 
 function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     % %Anchor Positions  for height exp
-    cleanup = onCleanup(@()myCleanup());
     cd (name)
     dinfo = dir('pos*.txt');
     filenames = {dinfo.name};
@@ -109,10 +112,10 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     % NO NEED TO COMMENT/UNCOMMENT
     % Display plot while done
     
-    % To be used for blockage scenario
-    BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
-    BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
-    
+%     % To be used for blockage scenario
+%     BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
+%     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
+    ax = computeAxis(x_anch, y_anch);
     figure();
     box on;
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
@@ -156,7 +159,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     plot_true_pos = plot(x_true, y_true, 'r.-','LineWidth',1);
     % Plot the measured positions of tags
     plot_measured = plot(x_measure, y_measure,'b-','LineWidth',2);
-    axis([-15 15 -15 15]);
+    axis(ax);
     daspect([1 1 1]);
     grid on;
     l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
@@ -179,11 +182,11 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     % NO NEED TO COMMENT/UNCOMMENT
     % Display plot while done
     
-    % To be used for blockage scenario
-    BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
-    BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
+%     % To be used for blockage scenario
+%     BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
+%     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
       
-    
+    ax = computeAxis(x_anch, y_anch);
     figure();
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
     e1 = errorbar(x_measure, y_measure, y_std, y_std, x_std, x_std,...
@@ -214,15 +217,26 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     grid on;
     l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor');
     set(l, 'Location', 'southeast');
-    axis([-15 15 -15 15]);
+    axis(ax);
     title(title_name);
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
     
 end
 
+function ax = computeAxis(x_anch,y_anch)
+    ax=zeros(1,4);
+    ax(1) = min(x_anch)-5;
+    ax(2) = max(x_anch)+5;
+    ax(3) = min(y_anch)-5;
+    ax(4) = max(y_anch)+5;
+return
+
+end
+
 function myCleanup(S)
 disp('All Close');
 delete(S);
 fclose("all");
+cd ..
 end

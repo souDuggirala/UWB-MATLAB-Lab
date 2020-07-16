@@ -1,6 +1,6 @@
 %Ground truth
-X_TRUE = [5.9119];
-Y_TRUE = [4.9179];
+X_TRUE = 5.9119;
+Y_TRUE = 4.9179;
 
 %Anchor postion for TagElevated,AnchorsElevated,SquareTopology%
 x_anch_outdoor=[0,   0,  10, 10];
@@ -9,7 +9,6 @@ y_anch_outdoor=[0,   10, 0,  10];
 GeoExp('LabOutdoor',x_anch_outdoor,y_anch_outdoor,X_TRUE,Y_TRUE);
 
 function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
-    % %Anchor Positions  for height exp
     cleanup = onCleanup(@()myCleanup());
     dinfo = dir('pos*.txt');
     filenames = {dinfo.name};
@@ -19,7 +18,6 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     y_tag_pos_std=zeros(1,length(filenames));
     for K = 1 : length(filenames)
         thisfile = filenames{K};
-        display(thisfile);
         %read the raw file as matrix first row is ignored
 		pos1 = readmatrix(thisfile);
         %extracted X and Y coordinates from the file 
@@ -94,7 +92,10 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     plot_true_pos = plot(x_true, y_true, 'r.-','LineWidth',1);
     % Plot the measured positions of tags
     plot_measured = plot(x_measure, y_measure,'b-','LineWidth',2);
-    axis([-10 10 -10 10]);
+    axis([-5 15 -5 15]);
+    
+    xticks(-5:1:15);
+    yticks(-5:1:15);
     daspect([1 1 1]);
     grid on;
     l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
@@ -152,7 +153,9 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     grid on;
     l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor');
     set(l, 'Location', 'southeast');
-    axis([-10 10 -10 10]);
+    axis([-5 15 -5 15]);
+    xticks(-5:1:15);
+    yticks(-5:1:15);
     title(title_name);
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
