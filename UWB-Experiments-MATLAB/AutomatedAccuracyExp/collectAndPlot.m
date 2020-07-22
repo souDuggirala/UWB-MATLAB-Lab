@@ -11,7 +11,7 @@ function collectAndPlot()
     %Ground truth
     x_true = zeros(1,postions);
     y_true = zeros(1,postions);
-    
+
     %Anchor postion
     x_anch_pos = zeros(1,anchNumber);
     y_anch_pos = zeros(1,anchNumber);
@@ -30,7 +30,7 @@ function collectAndPlot()
             y_true(i) = input("Enter y coordinate of postion " + i + " ");
         end 
         
-    elseif(method == 'N')
+    elseif(method == 'N')   
         disp("We will be using triangulation for getting coordinates.")
     
         for i = 1:postions
@@ -193,7 +193,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     grid on;
     l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
         'True Position','Measured Position','Standard Deviation (Oval)',...
-        'Anchor', 'Accuracy Buffer (±0.1m)');
+        'Anchor', 'Accuracy Buffer (ï¿½0.1m)');
     set(l, 'Location', 'southeast');
     title(title_name);
     xlabel('X coordinate (m)');
@@ -247,7 +247,7 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     end
     daspect([1 1 1]);
     grid on;
-    l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor');
+    l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (ï¿½0.1m)','Anchor');
     set(l, 'Location', 'southeast');
     axis(axs);
     title(title_name);
