@@ -1,5 +1,5 @@
 
-function FetchAndPlot()
+function collectAndPlot()
 
     %Getting number of the experiment
     postions = input("Enter the number of postions ");
@@ -21,17 +21,34 @@ function FetchAndPlot()
         y_anch_pos(i) = input("Enter y coordinate of anchor " + i + " ");        
     end
     
-    for i = 1:postions 
-        x_true(i) = input("Enter x coordinate of postion " + i + " "); 
-        y_true(i) = input("Enter y coordinate of postion " + i + " ");        
-    end
+    %Getting coordinates of postions 
+    method = input("Do you have actual coordinates of postions?(Y/N) ",'s');
     
+    if(method == 'Y')
+        for i = 1:postions 
+            x_true(i) = input("Enter x coordinate of postion " + i + " "); 
+            y_true(i) = input("Enter y coordinate of postion " + i + " ");
+        end 
+        
+    elseif(method == 'N')
+        disp("We will be using triangulation for getting coordinates.")
+    
+        for i = 1:postions
+            anchorNumber = input("Enter anchor number you want to use as reference as [1 2] or [1 2 3] for postion"+i+" " );
+            distanceFromAnchor = input("Enter distance of tag from those anchor in same order [d1 d2 d3] for postion"+i+" " );
+            coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
+            disp(coordinates);
+            %x_anch_pos(i) = coordinates(1);
+            %y_anch_pos(i) = coordinates(2);       
+        end    
+    end
+        
     disp(x_true);
     disp(y_true);
     disp(x_anch_pos);
     disp(y_anch_pos)
-    WritePosFile(postions,expName);
-    GeoExp(expName,x_anch_pos,y_anch_pos,x_true,y_true);
+    %WritePosFile(postions,expName);
+    %GeoExp(expName,x_anch_pos,y_anch_pos,x_true,y_true);
 
 end
 
@@ -43,15 +60,15 @@ function WritePosFile(postions,expName)
     newDir = expName;
     mkdir newDir
     cd newDir
-    for i = linspace(1,postions,1)
+    for i = linspace(1,postions,postions)
        fileName="pos"+string(i)+".txt";
+       disp(fileName);
        tStart=tic;%starts the timer
        fileID = fopen(fileName,'w');
        while(true)
            data = readline(s);
-           disp(data)
             fprintf(fileID,data+"\n");
-            if(toc(tStart)>1*30)
+            if(toc(tStart)>2*60)
                 disp("Done with the file");
                 while(true)
                     confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
@@ -78,6 +95,8 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     cd (name)
     dinfo = dir('pos*.txt');
     filenames = {dinfo.name};
+    Xerror=zeros(1,1);
+    Yerror=zeros(1,1);
     x_tag_pos_avg=zeros(1,length(filenames));
     y_tag_pos_avg=zeros(1,length(filenames));
     x_tag_pos_std=zeros(1,length(filenames));
@@ -90,6 +109,8 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
         %extracted X and Y coordinates from the file 
 		pos1 = pos1(:,4:5);
 		pos1 = pos1(all(~isnan(pos1),2),:);
+        Xerror = [Xerror;(pos1(:,1) - x_true(K))];
+        Yerror = [Yerror;(pos1(:,2) - y_true(K))];
         avgPos1 = mean(pos1);
         stdPos1 = std(pos1);
         x_tag_pos_avg(1,K) = avgPos1(1,1);
@@ -97,6 +118,12 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
         x_tag_pos_std(1,K) = stdPos1(1,1);
         y_tag_pos_std(1,K) = stdPos1(1,2);
     end
+    
+    figure(1)
+    histogram(Xerror);
+    figure(2)
+    histogram(Yerror);
+    save('test','Xerror','Yerror')
 
 pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
     x_anch_pos, y_anch_pos, name);
@@ -222,6 +249,40 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
     
+end
+
+
+function coordinates = triangulationForCordinates(aNum,ds,xAP,yAP)
+syms x y;
+coordinates = zeros(1,2);
+ref = length(aNum);
+disp(coordinates);
+disp(aNum);
+disp(ref);
+
+if ref == 2
+    disp("reached")
+    x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(1));
+    d1 = ds(1); d2 = ds(2);
+    eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
+    eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
+    S = solve(eq1,eq2,x>x1,y>y1);
+    disp(double(S.x) + " " + double(S.y));
+    coordinates = [double(S.x) double(S.y)];
+
+
+elseif ref == 3
+    x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(1));
+    x3 = xAP(aNum(3));y3 = yAP(aNum(3));
+    d1 = ds(1); d2 = ds(2);d3 = ds(3);
+    eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
+    eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
+    eq3 = (x-x3)^2 + (y-y3)^2 == d3^2;
+    S = solve(eq1,eq2,eq3,x>x1,y>y1);
+    coordinates = [double(S.x) double(S.y)];    
+end
+
+
 end
 
 function ax = computeAxis(x_anch,y_anch)

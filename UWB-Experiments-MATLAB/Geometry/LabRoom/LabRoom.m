@@ -10,6 +10,8 @@ GeoExp('LabRoom',x_anch_height,y_anch_height,X_TRUE,Y_TRUE);
 
 function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     % %Anchor Positions  for height exp
+    Xerror=zeros(1,1);
+    Yerror=zeros(1,1);
     cleanup = onCleanup(@()myCleanup());
     dinfo = dir('pos*.txt');
     filenames = {dinfo.name};
@@ -19,12 +21,13 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     y_tag_pos_std=zeros(1,length(filenames));
     for K = 1 : length(filenames)
         thisfile = filenames{K};
-        display(thisfile);
         %read the raw file as matrix first row is ignored
 		pos1 = readmatrix(thisfile);
         %extracted X and Y coordinates from the file 
 		pos1 = pos1(:,4:5);
 		pos1 = pos1(all(~isnan(pos1),2),:);
+        Xerror = [Xerror;(pos1(:,1) - x_true(K))];
+        Yerror = [Yerror;(pos1(:,2) - y_true(K))];
         avgPos1 = mean(pos1);
         stdPos1 = std(pos1);
         x_tag_pos_avg(1,K) = avgPos1(1,1);
@@ -32,7 +35,11 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
         x_tag_pos_std(1,K) = stdPos1(1,1);
         y_tag_pos_std(1,K) = stdPos1(1,2);
     end
-
+    figure(1)
+    histogram(Xerror);
+    figure(2)
+    histogram(Yerror);
+    save('test','Xerror','Yerror')
 pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
     x_anch_pos, y_anch_pos, name);
 pos_errorbar(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
@@ -54,6 +61,9 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     figure();
     box on;
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
+    ax=gca;
+    ax.XTickMode = 'auto';
+    ax.XTickMode = 'auto';
     hold on;
     % Plot the dummy handles for legend
     std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
@@ -91,10 +101,10 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
         rectangle('Position',BLOCKAGE2_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
     end
     % Plot the true positions of tags
-    plot_true_pos = plot(x_true, y_true, 'r.-','LineWidth',1);
+    plot_true_pos = plot(x_true, y_true,'r+','LineWidth',2,'MarkerSize',5);
     % Plot the measured positions of tags
-    plot_measured = plot(x_measure, y_measure,'b-','LineWidth',2);
-    axis([-10 10 -10 10]);
+    plot_measured = plot(x_measure, y_measure,'bo','LineWidth',2,'MarkerSize',5);
+    axis([-2 10 -2 10]);
     daspect([1 1 1]);
     grid on;
     l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
@@ -102,6 +112,8 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
         'Anchor', 'Accuracy Buffer (±0.1m)');
     set(l, 'Location', 'southeast');
     title(title_name);
+    xticks(-2:1:10);
+    yticks(-2:1:10);
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
     hold off;
@@ -124,8 +136,10 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     
     figure();
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
-    e1 = errorbar(x_measure, y_measure, y_std, y_std, x_std, x_std,...
-        'Marker','o','LineStyle','-','LineWidth',2);
+    ax=gca;
+    ax.XTickMode = 'auto';
+    ax.XTickMode = 'auto';
+    e1 = errorbar(x_measure, y_measure, y_std, y_std, x_std, x_std,'bo','LineWidth',2,'MarkerSize',5);
     hold on;
     % Plot the anchor positions
     anch = plot(x_anch, y_anch, 'b^');
@@ -142,7 +156,7 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
         rectangle('Position',BLOCKAGE2_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
     end
     
-    true_pos = plot(x_true, y_true, 'r.-','LineWidth',1);
+    true_pos = plot(x_true, y_true,'r+','LineWidth',2,'MarkerSize',5);
     % Plot the connection from truth to measurements
     for i = 1:1:length(x_true)
         quiver(x_true(i), y_true(i), x_measure(i)-x_true(i), y_measure(i)-y_true(i),'color','k','LineStyle',':','LineWidth',0.3);
@@ -152,7 +166,7 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     grid on;
     l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor');
     set(l, 'Location', 'southeast');
-    axis([-10 10 -10 10]);
+    axis([-2 10 -2 10]);
     title(title_name);
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
