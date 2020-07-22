@@ -1,12 +1,12 @@
 
 function collectAndPlot()
-
+    cleanup = onCleanup(@()myCleanup());
     %Getting number of the experiment
     postions = input("Enter the number of postions ");
     %Getting name of the experiment
     expName = input("Enter the name of the experiment ",'s');
     %Getting number of anchors
-    anchNumber = input("Enter the number of UWB anchors");
+    anchNumber = input("Enter the number of UWB anchors ");
     
     %Ground truth
     x_true = zeros(1,postions);
@@ -34,12 +34,11 @@ function collectAndPlot()
         disp("We will be using triangulation for getting coordinates.")
     
         for i = 1:postions
-            anchorNumber = input("Enter anchor number you want to use as reference as [1 2] or [1 2 3] for postion"+i+" " );
-            distanceFromAnchor = input("Enter distance of tag from those anchor in same order [d1 d2 d3] for postion"+i+" " );
+            anchorNumber = input("Enter anchor number you want to use as reference in order e.g. [1 2] or [1 2 3] for postion "+i+" " );
+            distanceFromAnchor = input("Enter distance of tag from those anchor in same order [d1 d2 d3] for postion "+i+" " );
             coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
-            disp(coordinates);
-            %x_anch_pos(i) = coordinates(1);
-            %y_anch_pos(i) = coordinates(2);       
+            x_true(i) = coordinates(1);
+            y_true(i) = coordinates(2);       
         end    
     end
         
@@ -47,19 +46,17 @@ function collectAndPlot()
     disp(y_true);
     disp(x_anch_pos);
     disp(y_anch_pos)
-    %WritePosFile(postions,expName);
-    %GeoExp(expName,x_anch_pos,y_anch_pos,x_true,y_true);
+    WritePosFile(postions,expName);
+    GeoExp(expName,x_anch_pos,y_anch_pos,x_true,y_true);
 
 end
 
 function WritePosFile(postions,expName)
     %postions = input("Enter the number of postions ");
     serialPort = input("Enter the serial port ",'s');
-    cleanup = onCleanup(@()myCleanup(serialPort));
     s=serialport(serialPort,115200);
-    newDir = expName;
-    mkdir newDir
-    cd newDir
+    mkdir (expName)
+    cd (expName)
     for i = linspace(1,postions,postions)
        fileName="pos"+string(i)+".txt";
        disp(fileName);
@@ -70,7 +67,7 @@ function WritePosFile(postions,expName)
             fprintf(fileID,data+"\n");
             if(toc(tStart)>2*60)
                 disp("Done with the file");
-                while(true)
+                while(i~=postions)
                     confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
                     if(confirmation=="Y")
                         break;
@@ -121,9 +118,11 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     
     figure(1)
     histogram(Xerror);
+    xlabel('Errors in X coordinate (m)');
     figure(2)
+    xlabel('Errors in Y coordinate (m)');
     histogram(Yerror);
-    save('test','Xerror','Yerror')
+    save('Error','Xerror','Yerror')
 
 pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
     x_anch_pos, y_anch_pos, name);
@@ -142,10 +141,13 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
 %     % To be used for blockage scenario
 %     BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
 %     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
-    ax = computeAxis(x_anch, y_anch);
+    axs = computeAxis(x_anch, y_anch);
     figure();
     box on;
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
+    ax=gca;
+    ax.XTickMode = 'auto';
+    ax.XTickMode = 'auto';
     hold on;
     % Plot the dummy handles for legend
     std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
@@ -186,7 +188,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     plot_true_pos = plot(x_true, y_true, 'r.-','LineWidth',1);
     % Plot the measured positions of tags
     plot_measured = plot(x_measure, y_measure,'b-','LineWidth',2);
-    axis(ax);
+    axis(axs);
     daspect([1 1 1]);
     grid on;
     l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
@@ -213,9 +215,12 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
 %     BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
 %     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
       
-    ax = computeAxis(x_anch, y_anch);
+    axs = computeAxis(x_anch, y_anch);
     figure();
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
+    ax=gca;
+    ax.XTickMode = 'auto';
+    ax.XTickMode = 'auto';
     e1 = errorbar(x_measure, y_measure, y_std, y_std, x_std, x_std,...
         'Marker','o','LineStyle','-','LineWidth',2);
     hold on;
@@ -244,7 +249,7 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     grid on;
     l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor');
     set(l, 'Location', 'southeast');
-    axis(ax);
+    axis(axs);
     title(title_name);
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
@@ -256,29 +261,30 @@ function coordinates = triangulationForCordinates(aNum,ds,xAP,yAP)
 syms x y;
 coordinates = zeros(1,2);
 ref = length(aNum);
-disp(coordinates);
-disp(aNum);
-disp(ref);
+% disp(coordinates);
+% disp(aNum);
+% disp(ds);
+% disp(xAP);
+% disp(yAP);
+% disp(ref);
 
 if ref == 2
-    disp("reached")
-    x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(1));
+    x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(2));
     d1 = ds(1); d2 = ds(2);
     eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
     eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
     S = solve(eq1,eq2,x>x1,y>y1);
-    disp(double(S.x) + " " + double(S.y));
     coordinates = [double(S.x) double(S.y)];
 
 
 elseif ref == 3
-    x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(1));
+    x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(2));
     x3 = xAP(aNum(3));y3 = yAP(aNum(3));
     d1 = ds(1); d2 = ds(2);d3 = ds(3);
     eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
     eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
     eq3 = (x-x3)^2 + (y-y3)^2 == d3^2;
-    S = solve(eq1,eq2,eq3,x>x1,y>y1);
+    S = solve(eq1,eq2,eq3);
     coordinates = [double(S.x) double(S.y)];    
 end
 
@@ -291,13 +297,11 @@ function ax = computeAxis(x_anch,y_anch)
     ax(2) = max(x_anch)+5;
     ax(3) = min(y_anch)-5;
     ax(4) = max(y_anch)+5;
-return
-
 end
 
-function myCleanup(S)
-disp('All Close');
-delete(S);
+function myCleanup()
+disp('Close ALL');
 fclose("all");
+clear;
 cd ..
 end

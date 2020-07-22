@@ -1,15 +1,54 @@
+%Getting number of the experiment
+postions = input("Enter the number of postions ");
+%Getting name of the experiment
+expName = input("Enter the name of the experiment ",'s');
+%Getting number of anchors
+anchNumber = input("Enter the number of UWB anchors ");
+
 %Ground truth
-X_TRUE = 5.9119;
-Y_TRUE = 4.9179;
+x_true = zeros(1,postions);
+y_true = zeros(1,postions);
 
-%Anchor postion for TagElevated,AnchorsElevated,SquareTopology%
-x_anch_outdoor=[0,   0,  10, 10];
-y_anch_outdoor=[0,   10, 0,  10];
+%Anchor postion
+x_anch_pos = zeros(1,anchNumber);
+y_anch_pos = zeros(1,anchNumber);
 
-GeoExp('LabOutdoor',x_anch_outdoor,y_anch_outdoor,X_TRUE,Y_TRUE);
+for i = 1:anchNumber 
+    x_anch_pos(i) = input("Enter x coordinate of anchor " + i + " "); 
+    y_anch_pos(i) = input("Enter y coordinate of anchor " + i + " ");        
+end
+
+%Getting coordinates of postions 
+method = input("Do you have actual coordinates of postions?(Y/N) ",'s');
+
+if(method == 'Y')
+    for i = 1:postions 
+        x_true(i) = input("Enter x coordinate of postion " + i + " "); 
+        y_true(i) = input("Enter y coordinate of postion " + i + " ");
+    end 
+
+elseif(method == 'N')
+    disp("We will be using triangulation for getting coordinates.")
+
+    for i = 1:postions
+        anchorNumber = input("Enter anchor number you want to use as reference in order e.g. [1 2] or [1 2 3] for postion "+i+" " );
+        distanceFromAnchor = input("Enter distance of tag from those anchor in same order [d1 d2 d3] for postion "+i+" " );
+        coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
+        x_true(i) = coordinates(1);
+        y_true(i) = coordinates(2);       
+    end    
+end
+disp(x_anch_pos)
+disp(y_anch_pos)
+disp(x_true)
+disp(y_true)
+GeoExp(expName,x_anch_pos,y_anch_pos,x_true,y_true);
 
 function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     cleanup = onCleanup(@()myCleanup());
+    cd (name)
+    Xerror=zeros(1,1);
+    Yerror=zeros(1,1);
     dinfo = dir('pos*.txt');
     filenames = {dinfo.name};
     x_tag_pos_avg=zeros(1,length(filenames));
@@ -23,6 +62,8 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
         %extracted X and Y coordinates from the file 
 		pos1 = pos1(:,4:5);
 		pos1 = pos1(all(~isnan(pos1),2),:);
+        Xerror = [Xerror;(pos1(:,1) - x_true(K))];
+        Yerror = [Yerror;(pos1(:,2) - y_true(K))];
         avgPos1 = mean(pos1);
         stdPos1 = std(pos1);
         x_tag_pos_avg(1,K) = avgPos1(1,1);
@@ -30,6 +71,14 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
         x_tag_pos_std(1,K) = stdPos1(1,1);
         y_tag_pos_std(1,K) = stdPos1(1,2);
     end
+    
+    figure(1);
+    histogram(Xerror);
+    xlabel('Errors in X coordinate (m)');
+    figure(2);
+    histogram(Yerror);
+    xlabel('Errors in Y coordinate (m)');
+    save('Error','Xerror','Yerror')
 
 pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
     x_anch_pos, y_anch_pos, name);
@@ -48,10 +97,13 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     % To be used for blockage scenario
     %BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
     %BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
-    
+    axs = computeAxis(x_anch, y_anch);
     figure();
     box on;
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
+    ax=gca;
+    ax.XTickMode = 'auto';
+    ax.XTickMode = 'auto';
     hold on;
     % Plot the dummy handles for legend
     std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
@@ -92,10 +144,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     plot_true_pos = plot(x_true, y_true, 'r.-','LineWidth',1);
     % Plot the measured positions of tags
     plot_measured = plot(x_measure, y_measure,'b-','LineWidth',2);
-    axis([-5 15 -5 15]);
-    
-    xticks(-5:1:15);
-    yticks(-5:1:15);
+    axis(axs);
     daspect([1 1 1]);
     grid on;
     l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
@@ -122,9 +171,12 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
       
-    
+    axs = computeAxis(x_anch, y_anch);
     figure();
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
+    ax=gca;
+    ax.XTickMode = 'auto';
+    ax.XTickMode = 'auto';
     e1 = errorbar(x_measure, y_measure, y_std, y_std, x_std, x_std,...
         'Marker','o','LineStyle','-','LineWidth',2);
     hold on;
@@ -153,16 +205,57 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     grid on;
     l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor');
     set(l, 'Location', 'southeast');
-    axis([-5 15 -5 15]);
-    xticks(-5:1:15);
-    yticks(-5:1:15);
+    axis(axs);
     title(title_name);
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
     
 end
 
+
+function coordinates = triangulationForCordinates(aNum,ds,xAP,yAP)
+syms x y;
+coordinates = zeros(1,2);
+ref = length(aNum);
+% disp(coordinates);
+% disp(aNum);
+% disp(ds);
+% disp(xAP);
+% disp(yAP);
+% disp(ref);
+
+if ref == 2
+    x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(2));
+    d1 = ds(1); d2 = ds(2);
+    eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
+    eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
+    S = solve(eq1,eq2,x>x1,y>y1);
+    coordinates = [double(S.x) double(S.y)];
+
+
+elseif ref == 3
+    x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(2));
+    x3 = xAP(aNum(3));y3 = yAP(aNum(3));
+    d1 = ds(1); d2 = ds(2);d3 = ds(3);
+    eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
+    eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
+    eq3 = (x-x3)^2 + (y-y3)^2 == d3^2;
+    S = solve(eq1,eq2,eq3);
+    coordinates = [double(S.x) double(S.y)];    
+end
+end
+
+function ax = computeAxis(x_anch,y_anch)
+    ax=zeros(1,4);
+    ax(1) = min(x_anch)-5;
+    ax(2) = max(x_anch)+5;
+    ax(3) = min(y_anch)-5;
+    ax(4) = max(y_anch)+5;
+end
+
+
 function myCleanup()
-disp('All Close');
+disp('Close ALL');
 fclose("all");
+clear;
 end
