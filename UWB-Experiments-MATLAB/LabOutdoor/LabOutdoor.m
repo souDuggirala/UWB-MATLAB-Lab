@@ -1,52 +1,97 @@
-%Getting number of the experiment
-postions = input("Enter the number of postions ");
-%Getting name of the experiment
-expName = input("Enter the name of the experiment ",'s');
-%Getting number of anchors
-anchNumber = input("Enter the number of UWB anchors ");
-
-%Ground truth
-x_true = zeros(1,postions);
-y_true = zeros(1,postions);
-
-%Anchor postion
-x_anch_pos = zeros(1,anchNumber);
-y_anch_pos = zeros(1,anchNumber);
-
-for i = 1:anchNumber 
-    x_anch_pos(i) = input("Enter x coordinate of anchor " + i + " "); 
-    y_anch_pos(i) = input("Enter y coordinate of anchor " + i + " ");        
-end
-
-%Getting coordinates of postions 
-method = input("Do you have actual coordinates of postions?(Y/N) ",'s');
-
-if(method == 'Y')
-    for i = 1:postions 
-        x_true(i) = input("Enter x coordinate of postion " + i + " "); 
-        y_true(i) = input("Enter y coordinate of postion " + i + " ");
-    end 
-
-elseif(method == 'N')
-    disp("We will be using triangulation for getting coordinates.")
-
-    for i = 1:postions
-        anchorNumber = input("Enter anchor number you want to use as reference in order e.g. [1 2] or [1 2 3] for postion "+i+" " );
-        distanceFromAnchor = input("Enter distance of tag from those anchor in same order [d1 d2 d3] for postion "+i+" " );
-        coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
-        x_true(i) = coordinates(1);
-        y_true(i) = coordinates(2);       
-    end    
-end
-disp(x_anch_pos)
-disp(y_anch_pos)
-disp(x_true)
-disp(y_true)
-GeoExp(expName,x_anch_pos,y_anch_pos,x_true,y_true);
-
-function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
+function LabOutdoor()
+    global status expName;
+    status = "ST";
     cleanup = onCleanup(@()myCleanup());
-    cd (name)
+    %Getting name of the experiment
+    
+    try
+        expName = input("Enter the name of the experiment: ",'s');
+        %Getting number of the experiment
+
+        %Getting coordinates of postions 
+        if exist(expName+"/LastExpVar.mat", 'file')
+            existingValues = input("Do you want to use existing experimental variables?(Y/N) ",'s');
+        else
+            existingValues = "N";
+        end
+
+        if(strcmpi(existingValues,"Y"))
+            load(expName+"/LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
+
+        elseif(strcmpi(existingValues,"N"))
+            postions = input("Enter the number of postions: ");
+            %Getting number of anchors
+            anchNumber = input("Enter the number of UWB anchors: ");
+
+            %Ground truth
+            x_true = zeros(1,postions);
+            y_true = zeros(1,postions);
+
+            %Anchor postion
+            x_anch_pos = zeros(1,anchNumber);
+            y_anch_pos = zeros(1,anchNumber);
+
+            for i = 1:anchNumber
+                xPrompt = sprintf("\t Enter x coordinate of anchor %d :", i);
+                x_anch_pos(i) = input(xPrompt);
+                yPrompt = sprintf("\t Enter y coordinate of anchor %d :", i);
+                y_anch_pos(i) = input(yPrompt);        
+            end
+
+            %Getting coordinates of postions 
+            method = input("Do you have actual coordinates of postions?(Y/N) ",'s');
+
+            if(strcmpi(method,"Y"))
+                for i = 1:postions 
+                xPrompt = sprintf("\t Enter x coordinate of postion %d :", i);
+                x_anch_pos(i) = input(xPrompt);
+                yPrompt = sprintf("\t Enter y coordinate of postion %d :", i);
+                y_anch_pos(i) = input(yPrompt);     
+                end 
+
+            elseif(strcmpi(method,"N"))
+                disp("We will be using triangulation for getting coordinates.")
+
+                for i = 1:postions
+                    anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
+                        +"reference in order e.g. [1 2] or [1 2 3] for postion %d : ", i);
+                    anchorNumber = input(anchorNumberPrompt);
+                    distanceFromAnchorPrompt = sprintf("\t Enter distance "...
+                    +"of tag from those anchor in same order [d1 d2] or [d1 d2 d3] for postion %d : ", i);
+                    distanceFromAnchor = input(distanceFromAnchorPrompt);
+                    coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
+                    x_true(i) = coordinates(1);
+                    y_true(i) = coordinates(2);       
+                end    
+            end
+        end    
+
+        posAnchor = zeros(1,2*length(x_anch_pos));
+        posAnchor(1:2:end) = x_anch_pos;posAnchor(2:2:end) = y_anch_pos;
+        fprintf("\n\n Postion of archors in order " ); disp(1:1:length(x_anch_pos));
+        fprintf("\t(%d,%d)",posAnchor);
+        posTag = zeros(1,2*length(x_true));
+        posTag(1:2:end) = x_true;posTag(2:2:end) = y_true;
+        fprintf("\n\n Postion of tag(s) in order " ); disp(1:1:length(x_true));
+        fprintf("\t(%d,%d)",posAnchor);
+        GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
+    
+    catch ME
+        fprintf("\n"+ME.identifier);
+        delete(expName+"/*.mat")
+        delete(expName+"/*.png")
+        rethrow(ME)
+    end
+    status = "FT";
+end
+
+
+    
+
+
+function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
+    global expName
+    cd (expName)
     Xerror=zeros(1,1);
     Yerror=zeros(1,1);
     dinfo = dir('pos*.txt');
@@ -76,14 +121,16 @@ function GeoExp(name,x_anch_pos,y_anch_pos,x_true,y_true)
     histogram(Xerror);
     xlabel('Errors in X coordinate (m)');
     figure(2);
+    saveas(gcf,'XERROR.png');
     histogram(Yerror);
     xlabel('Errors in Y coordinate (m)');
-    save('Error','Xerror','Yerror')
-
+    saveas(gcf,'YERROR.png');
+    save('Error','Xerror','Yerror');
+    save("LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
 pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
-    x_anch_pos, y_anch_pos, name);
+    x_anch_pos, y_anch_pos, expName);
 pos_errorbar(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
-    x_anch_pos, y_anch_pos, name);
+    x_anch_pos, y_anch_pos, expName);
 end
 
 
@@ -97,13 +144,13 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     % To be used for blockage scenario
     %BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
     %BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
-    axs = computeAxis(x_anch, y_anch);
-    figure();
+    axs = computeAxisLim(x_anch, y_anch);
+    figure(3);
     box on;
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
     ax=gca;
     ax.XTickMode = 'auto';
-    ax.XTickMode = 'auto';
+    ax.YTickMode = 'auto';
     hold on;
     % Plot the dummy handles for legend
     std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
@@ -154,8 +201,10 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     title(title_name);
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
-    hold off;
     legend boxon
+    hold off;
+    saveas(gcf,'pos_plot.png')
+    
 
 end
 
@@ -171,12 +220,12 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
       
-    axs = computeAxis(x_anch, y_anch);
-    figure();
+    axs = computeAxisLim(x_anch, y_anch);
+    figure(4);
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
     ax=gca;
     ax.XTickMode = 'auto';
-    ax.XTickMode = 'auto';
+    ax.YTickMode = 'auto';
     e1 = errorbar(x_measure, y_measure, y_std, y_std, x_std, x_std,...
         'Marker','o','LineStyle','-','LineWidth',2);
     hold on;
@@ -209,6 +258,9 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     title(title_name);
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
+    legend boxon
+    hold off;
+    saveas(gcf,'pos_errorbar.png')
     
 end
 
@@ -245,7 +297,7 @@ elseif ref == 3
 end
 end
 
-function ax = computeAxis(x_anch,y_anch)
+function ax = computeAxisLim(x_anch,y_anch)
     ax=zeros(1,4);
     ax(1) = min(x_anch)-5;
     ax(2) = max(x_anch)+5;
@@ -255,7 +307,14 @@ end
 
 
 function myCleanup()
-disp('Close ALL');
+global expName status
+fprintf('\n Close ALL \n');
 fclose("all");
+fprintf(status + "\n");
+if ~strcmp(status,"FN")    
+    delete(expName+"/*.mat")
+    delete(expName+"/*.png")
+end
 clear;
+cd ..
 end
