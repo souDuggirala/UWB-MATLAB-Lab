@@ -22,9 +22,9 @@ function Test
         tline = fgetl(fid);
         check = size(tline);
         var=split(tline,",");
-        expression = '[^\n]*PuTTY[^\n]*';
+        expression = '[^\n]*POS[^\n]*';
         matches = regexp(tline,expression,'match');
-       if (isempty(matches) && (check(2)>10))
+        if (~isempty(matches) && (check(2)>10))
            X=str2double(var(4));
            Y=str2double(var(5));
            plot_measured=plot(X,Y, 'b^');

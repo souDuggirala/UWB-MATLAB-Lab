@@ -22,6 +22,7 @@ function collectAndPlot()
             existingValues = "N";
         end
         
+        existingAnchors = input("Anchors data exist?(Y/N) ",'s');
         if(strcmpi(existingValues,"Y"))
             load(expName+"/LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
             
@@ -49,9 +50,9 @@ function collectAndPlot()
             end
 
             %Getting coordinates of positions 
-            method = input("Do you have actual coordinates of positions?(Y/N) ",'s');
+            tagTruthMethod = input("Do you have actual coordinates of positions?(Y/N) ",'s');
 
-            if(strcmpi(method,"Y"))
+            if(strcmpi(tagTruthMethod,"Y"))
                 for i = 1:positions 
                 xPrompt = sprintf("\t Enter x coordinate of postion %d :", i);
                 x_anch_pos(i) = input(xPrompt);
@@ -59,7 +60,7 @@ function collectAndPlot()
                 y_anch_pos(i) = input(yPrompt);     
                 end 
 
-            elseif(strcmpi(method,"N"))
+            elseif(strcmpi(tagTruthMethod,"N"))
                 disp("We will be using triangulation for getting coordinates.")
                 
                 allSame = input("Do you plan to use same anchors for reference?(Y/N) ",'s');
