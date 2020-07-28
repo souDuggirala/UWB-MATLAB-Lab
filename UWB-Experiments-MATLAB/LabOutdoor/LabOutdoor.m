@@ -1,6 +1,14 @@
 function LabOutdoor()
     global status expName;
     status = "ST";
+    %Intializing Ground truth var
+    x_true = zeros(1,1);
+    y_true = zeros(1,1);
+
+    %Intializing Anchor postion var
+    x_anch_pos = zeros(1,1);
+    y_anch_pos = zeros(1,1);
+    
     cleanup = onCleanup(@()myCleanup());
     %Getting name of the experiment
     
@@ -8,7 +16,7 @@ function LabOutdoor()
         expName = input("Enter the name of the experiment: ",'s');
         %Getting number of the experiment
 
-        %Getting coordinates of postions 
+        %Checking if previous data of experiment is present
         if exist(expName+"/LastExpVar.mat", 'file')
             existingValues = input("Do you want to use existing experimental variables?(Y/N) ",'s');
         else
@@ -19,13 +27,14 @@ function LabOutdoor()
             load(expName+"/LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
 
         elseif(strcmpi(existingValues,"N"))
-            postions = input("Enter the number of postions: ");
+            %Getting number of the positions
+            positions = input("Enter the number of positions: ");
             %Getting number of anchors
             anchNumber = input("Enter the number of UWB anchors: ");
 
             %Ground truth
-            x_true = zeros(1,postions);
-            y_true = zeros(1,postions);
+            x_true = zeros(1,positions);
+            y_true = zeros(1,positions);
 
             %Anchor postion
             x_anch_pos = zeros(1,anchNumber);
@@ -38,11 +47,11 @@ function LabOutdoor()
                 y_anch_pos(i) = input(yPrompt);        
             end
 
-            %Getting coordinates of postions 
-            method = input("Do you have actual coordinates of postions?(Y/N) ",'s');
+            %Getting coordinates of positions 
+            method = input("Do you have actual coordinates of positions?(Y/N) ",'s');
 
             if(strcmpi(method,"Y"))
-                for i = 1:postions 
+                for i = 1:positions 
                 xPrompt = sprintf("\t Enter x coordinate of postion %d :", i);
                 x_anch_pos(i) = input(xPrompt);
                 yPrompt = sprintf("\t Enter y coordinate of postion %d :", i);
@@ -51,13 +60,22 @@ function LabOutdoor()
 
             elseif(strcmpi(method,"N"))
                 disp("We will be using triangulation for getting coordinates.")
-
-                for i = 1:postions
+                
+                allSame = input("Do you plan to use same anchors for all positions as reference?(Y/N) ",'s');
+                if(strcmpi(allSame,"Y"))
                     anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
-                        +"reference in order e.g. [1 2] or [1 2 3] for postion %d : ", i);
-                    anchorNumber = input(anchorNumberPrompt);
+                        +"reference in order e.g. [1 2] or [1 2 3] for positions: ");
+                    anchorNumber = input(anchorNumberPrompt);                    
+                end
+
+                for i = 1:positions
+                    if(strcmpi(allSame,"N"))
+                        anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
+                        +"reference in order e.g. [1 2] or [1 2 3] for position %d : ", i);
+                        anchorNumber = input(anchorNumberPrompt);
+                    end    
                     distanceFromAnchorPrompt = sprintf("\t Enter distance "...
-                    +"of tag from those anchor in same order [d1 d2] or [d1 d2 d3] for postion %d : ", i);
+                    +"of tag from those anchor in same order [d1 d2] or [d1 d2 d3] for position %d : ", i);
                     distanceFromAnchor = input(distanceFromAnchorPrompt);
                     coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
                     x_true(i) = coordinates(1);
@@ -73,7 +91,7 @@ function LabOutdoor()
         posTag = zeros(1,2*length(x_true));
         posTag(1:2:end) = x_true;posTag(2:2:end) = y_true;
         fprintf("\n\n Postion of tag(s) in order " ); disp(1:1:length(x_true));
-        fprintf("\t(%d,%d)",posAnchor);
+        fprintf("\t(%0.2f,%0.2f)",posTag);
         GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
     
     catch ME
@@ -90,7 +108,7 @@ end
 
 
 function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
-    global expName
+    global expName;
     cd (expName)
     Xerror=zeros(1,1);
     Yerror=zeros(1,1);
@@ -165,7 +183,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
         yradius = y_std(i);
         x_s = xradius * cos(theta) + xcenter;
         y_s = yradius * sin(theta) + ycenter;
-        h = fill(x_s,y_s,'b','facealpha',0.3);
+        fill(x_s,y_s,'b','facealpha',0.3);
         hold on
     end
 
@@ -264,24 +282,27 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     
 end
 
+% function calculates the ground-truth tag coordinates 
+% according to surveyed results in experiments (solving equation set)
+% Options: two-point surveying & three-point surveying
 
 function coordinates = triangulationForCordinates(aNum,ds,xAP,yAP)
 syms x y;
 coordinates = zeros(1,2);
 ref = length(aNum);
-% disp(coordinates);
-% disp(aNum);
-% disp(ds);
-% disp(xAP);
-% disp(yAP);
-% disp(ref);
 
 if ref == 2
     x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(2));
     d1 = ds(1); d2 = ds(2);
     eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
     eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
-    S = solve(eq1,eq2,x>x1,y>y1);
+    if aNum(1) == 1
+        S = solve(eq1,eq2,x>=x1,y>=y1);
+    elseif aNum(1) == 2 
+        S = solve(eq1,eq2,x<=x1,y>=y1);
+    elseif aNum(1) == 3 
+            S = solve(eq1,eq2,x<=x1,y<=y1);
+    end
     coordinates = [double(S.x) double(S.y)];
 
 
