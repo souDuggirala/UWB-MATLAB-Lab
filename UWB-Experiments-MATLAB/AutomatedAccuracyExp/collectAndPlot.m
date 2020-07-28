@@ -122,6 +122,7 @@ function WritePosFile(positions,duration)
         disp(fileName);
         fileID = fopen(fileName,'w');
         tStart=tic;  %starts the timer
+        flush(s);
         while(true)
             data = readline(s);
             fprintf(fileID,data+"\n");
@@ -386,7 +387,7 @@ fprintf(status + "\n");
 if ~strcmp(status,"FN")    
     delete(expName+"/*.mat")
     delete(expName+"/*.png")
-    cd ..
 end
+cd ..
 clear;
 end
