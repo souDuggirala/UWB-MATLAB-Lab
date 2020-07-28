@@ -102,8 +102,6 @@ function collectAndPlot()
    catch ME
        
        fprintf("\n"+ME.identifier);
-       delete(expName+"/*.mat")
-       delete(expName+"/*.png")
        rethrow(ME)
        
    end
@@ -384,7 +382,7 @@ global expName status
 fprintf('\n Close ALL \n');
 fclose("all");
 fprintf(status + "\n");
-if ~strcmp(status,"FN")    
+if ~strcmp(status,"FT")
     delete(expName+"/*.mat")
     delete(expName+"/*.png")
 end
