@@ -135,10 +135,10 @@ function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
         y_tag_pos_std(1,K) = stdPos1(1,2);
     end
     
-    figure(1);
+    figure();
     histogram(Xerror);
     xlabel('Errors in X coordinate (m)');
-    figure(2);
+    figure();
     saveas(gcf,'XERROR.png');
     histogram(Yerror);
     xlabel('Errors in Y coordinate (m)');
@@ -163,7 +163,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     %BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
     %BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
     axs = computeAxisLim(x_anch, y_anch);
-    figure(3);
+    figure();
     box on;
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
     ax=gca;
@@ -214,7 +214,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     grid on;
     l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
         'True Position','Measured Position','Standard Deviation (Oval)',...
-        'Anchor', 'Accuracy Buffer (±0.1m)');
+        'Anchor', 'Accuracy Buffer (±0.1m)',"Linewidth",1.5);
     set(l, 'Location', 'southeast');
     title(title_name);
     xlabel('X coordinate (m)');
@@ -239,7 +239,7 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
       
     axs = computeAxisLim(x_anch, y_anch);
-    figure(4);
+    figure();
     set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
     ax=gca;
     ax.XTickMode = 'auto';
@@ -270,7 +270,7 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     end
     daspect([1 1 1]);
     grid on;
-    l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor');
+    l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor',"Linewidth",1.5);
     set(l, 'Location', 'southeast');
     axis(axs);
     title(title_name);
@@ -331,8 +331,7 @@ function myCleanup()
 global expName status
 fprintf('\n Close ALL \n');
 fclose("all");
-fprintf(status + "\n");
-if ~strcmp(status,"FN")    
+if ~strcmp(status,"FT")    
     delete(expName+"/*.mat")
     delete(expName+"/*.png")
 end
