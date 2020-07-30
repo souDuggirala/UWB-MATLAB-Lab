@@ -6,7 +6,7 @@ function collectAndPlot()
     x_true = zeros(1,1);
     y_true = zeros(1,1);
 
-    %Intializing Anchor postion var
+    %Intializing Anchor Position var
     x_anch_pos = zeros(1,1);
     y_anch_pos = zeros(1,1);
     
@@ -26,10 +26,12 @@ function collectAndPlot()
             load(expName+"/LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
             
         elseif(strcmpi(existingValues,"N"))
-            %Getting time duration of positioning data collection, in minutes
-            duration = input("Enter the time duration in minutes for each point: ");
             %Getting number of the positions
             positions = input("Enter the number of positions: ");
+            
+            %Getting time duration of positioning data collection, in minutes
+            duration = input("Enter the time duration in minutes for each position: ");
+
             %Getting number of anchors
             anchNumber = input("Enter the number of UWB anchors: ");
 
@@ -37,7 +39,7 @@ function collectAndPlot()
             x_true = zeros(1,positions);
             y_true = zeros(1,positions);
 
-            %Anchor postion
+            %Anchor Position
             x_anch_pos = zeros(1,anchNumber);
             y_anch_pos = zeros(1,anchNumber);
             
@@ -53,10 +55,10 @@ function collectAndPlot()
 
             if(strcmpi(method,"Y"))
                 for i = 1:positions 
-                xPrompt = sprintf("\t Enter x coordinate of postion %d :", i);
-                x_anch_pos(i) = input(xPrompt);
-                yPrompt = sprintf("\t Enter y coordinate of postion %d :", i);
-                y_anch_pos(i) = input(yPrompt);     
+                xPrompt = sprintf("\t Enter x coordinate of Position %d :", i);
+                x_true(i) = input(xPrompt);
+                yPrompt = sprintf("\t Enter y coordinate of Position %d :", i);
+                y_true(i) = input(yPrompt);     
                 end 
 
             elseif(strcmpi(method,"N"))
@@ -87,15 +89,17 @@ function collectAndPlot()
 
         posAnchor = zeros(1,2*length(x_anch_pos));
         posAnchor(1:2:end) = x_anch_pos;posAnchor(2:2:end) = y_anch_pos;
-        fprintf("\n\n Postion of archors in order " ); disp(1:1:length(x_anch_pos));
-        fprintf("\t(%d,%d)",posAnchor);
+        fprintf("\n\n Position of archors in order " ); disp(1:1:length(x_anch_pos));
+        fprintf("\t(%0.2f,%0.2f)",posAnchor);
         posTag = zeros(1,2*length(x_true));
         posTag(1:2:end) = x_true;posTag(2:2:end) = y_true;
-        fprintf("\n\n Postion of tag(s) in order " ); disp(1:1:length(x_true));
-        fprintf("\t(%d,%d)",posTag);
-        
-        %Writing files for the postions
-        WritePosFile(positions,duration);
+        fprintf("\n\n Position of tag(s) in order " ); disp(1:1:length(x_true));
+        fprintf("\t(%0.2f,%0.2f)",posTag);
+        fprintf("\n");
+        %Writing files for the Positions
+        if(~strcmpi(existingValues,"Y"))
+            WritePosFile(positions,duration);
+        end
         
         GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
     
@@ -112,17 +116,20 @@ end
 function WritePosFile(positions,duration)
     global expName;
     serialPort = input("Enter the serial port name (string): ",'s');
-    s=serialport(serialPort,115200);
+    s=serialport(serialPort,115200,"Timeout",30);
     mkdir (expName)
     cd (expName)
     for i = linspace(1,positions,positions)
         fileName="pos"+string(i)+".txt";
         disp(fileName);
         fileID = fopen(fileName,'w');
-        tStart=tic;  %starts the timer
+        pause(60);
+        k=1;
+        tStart=tic;%starts the timer
         flush(s);
         while(true)
             data = readline(s);
+            disp(k+" "+data);
             fprintf(fileID,data+"\n");
             if(toc(tStart)>duration*60)
                 disp("Done with the file");
@@ -135,7 +142,8 @@ function WritePosFile(positions,duration)
                     end   
                 end
                 break;
-            end          
+            end
+            k = k+1;
         end
     end
     fclose("all");
@@ -189,7 +197,7 @@ pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_s
     x_anch_pos, y_anch_pos, expName);
 pos_errorbar(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
     x_anch_pos, y_anch_pos, expName);
-
+    cd ..;
 end
 
 
@@ -242,8 +250,6 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     % Plot the buffer (+-10cm) for decawave
     centers = [x_true' y_true'];
     radii = repelem(0.1,length(x_true),1);
-    disp(centers);
-    disp(radii);
     buff=viscircles(centers,radii,'LineStyle','--','Color','m');
     
     if(contains(title_name,"Blocked"))
@@ -381,10 +387,14 @@ function myCleanup()
 global expName status
 fprintf('\n Close ALL \n');
 fclose("all");
+fprintf(expName + "\n");
 fprintf(status + "\n");
+disp(pwd)
+cd(expName);
 if ~strcmp(status,"FT")
-    delete(expName+"/*.mat")
-    delete(expName+"/*.png")
+    delete("*.mat")
+    delete("*.png")
+    delete("*.txt")
 end
 cd ..
 clear;
