@@ -5,11 +5,9 @@ function collectAndPlot()
     %Intializing Ground truth var
     x_true = zeros(1,1);
     y_true = zeros(1,1);
-
     %Intializing Anchor Position var
     x_anch_pos = zeros(1,1);
     y_anch_pos = zeros(1,1);
-    
     cleanup = onCleanup(@()myCleanup());
     try
         %Getting name of the experiment
@@ -58,13 +56,17 @@ function collectAndPlot()
         posAnchor = zeros(1,2*length(x_anch_pos));
         posAnchor(1:2:end) = x_anch_pos;posAnchor(2:2:end) = y_anch_pos;
         fprintf("\n\n Position of archors in order " ); disp(1:1:length(x_anch_pos));
-        fprintf("\t(%0.2f,%0.2f)",posAnchor);
+        fprintf("\t(%0.2f,%0.2f)\n",posAnchor);
         posTag = zeros(1,2*length(x_true));
         posTag(1:2:end) = x_true;posTag(2:2:end) = y_true;
         fprintf("\n\n Position of tag(s) in order " ); disp(1:1:length(x_true));
-        fprintf("\t(%0.2f,%0.2f)",posTag);
-        fprintf("\n");
-        %Writing files for the Positions
+        fprintf("\t(%0.2f,%0.2f)\n",posTag);
+        % Ask the tester to double check anchor's location
+        uiwait(msgbox(sprintf('Confirm Anchor Location: (x=%0.2f,y=%0.2f)\n', ...
+            posAnchor),'Anchor Setup Confirmation','warn'));
+        uiwait(msgbox('Make Sure You Set Up Each Anchor!',...
+            'Anchor Setup Confirmation','warn'));
+        % Writing files for the Positions
         if(~strcmpi(existingValues,"Y"))
             WritePosFile(positions,duration);
         end
@@ -74,7 +76,8 @@ function collectAndPlot()
    catch ME
        
        fprintf("\n"+ME.identifier);
-       rethrow(ME)
+       beep;
+       rethrow(ME);
        
    end
    status = "FT";
@@ -85,34 +88,47 @@ function WritePosFile(positions,duration)
     global expName;
     serialPort = input("Enter the serial port name (string): ",'s');
     s=serialport(serialPort,115200,"Timeout",30);
-    mkdir (expName)
-    cd (expName)
-    for i = linspace(1,positions,positions)
-        fileName="pos"+string(i)+".txt";
-        disp(fileName);
-        fileID = fopen(fileName,'w');
-        pause(20);
-        k=1;
-        tStart=tic;%starts the timer
-        flush(s);
-        while(true)
-            data = readline(s);
-            disp(k+" "+data);
-            fprintf(fileID,data+"\n");
-            if(toc(tStart)>duration*60)
-                disp("Done with the file");
-                while(i~=positions)
-                    confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
-                    if(confirmation=="Y"||confirmation=="y")
-                        break;
-                    else
-                        continue;
-                    end   
+    % Check if the serial port has bytes available. 
+    % If not, the listener might not be properly set up
+    fprintf("Checking the status of %s\n",serialPort);
+    initSerialIncomingBytes = s.NumBytesAvailable;
+    pause(5); %TODO: Change this 5 seconds adaptive to user-set update rate
+    if(initSerialIncomingBytes == s.NumBytesAvailable)
+        ME = MException('Serialport:NoBytesAvailable', ...
+        'Listener Not in Reporting Mode');
+        throw(ME);
+    else
+        fprintf("Status of %s is healthy, data recording\n\n",serialPort);
+        mkdir (expName)
+        cd (expName)
+        for i = linspace(1,positions,positions)
+            fileName="pos"+string(i)+".txt";
+            disp(fileName+' ' + 'collecting in progress');
+            fileID = fopen(fileName,'w');
+            pause(20);
+            k = 1;
+            tStart=tic;%starts the timer
+            flush(s);
+            while(true)
+                data = readline(s);
+                fprintf(fileID,data+"\n");
+                if(toc(tStart)>duration*60)
+                    disp("Done with the file");
+                    while(i~=positions)
+                        confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
+                        if(confirmation=="Y"||confirmation=="y")
+                            break;
+                        else
+                            continue;
+                        end   
+                    end
+                    break;
                 end
-                break;
+                k = k+1;
             end
-            k = k+1;
         end
+        
+        
     end
     fclose("all");
     cd ..
@@ -396,7 +412,6 @@ cd(expName);
 if ~strcmp(status,"FT")
     delete("*.mat")
     delete("*.png")
-    %delete("*.txt")
 end
 cd ..
 clear;
