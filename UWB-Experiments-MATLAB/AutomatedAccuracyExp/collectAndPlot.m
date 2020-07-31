@@ -50,41 +50,9 @@ function collectAndPlot()
                 y_anch_pos(i) = input(yPrompt);        
             end
 
-            %Getting coordinates of positions 
-            method = input("Do you have actual coordinates of positions?(Y/N) ",'s');
 
-            if(strcmpi(method,"Y"))
-                for i = 1:positions 
-                xPrompt = sprintf("\t Enter x coordinate of Position %d :", i);
-                x_true(i) = input(xPrompt);
-                yPrompt = sprintf("\t Enter y coordinate of Position %d :", i);
-                y_true(i) = input(yPrompt);     
-                end 
 
-            elseif(strcmpi(method,"N"))
-                disp("We will be using triangulation for getting coordinates.")
-                
-                allSame = input("Do you plan to use same anchors for reference?(Y/N) ",'s');
-                if(strcmpi(allSame,"Y"))
-                    anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
-                        +"reference in order e.g. [1 2] or [1 2 3] for positions: ");
-                    anchorNumber = input(anchorNumberPrompt);                    
-                end
 
-                for i = 1:positions
-                    if(strcmpi(allSame,"N"))
-                        anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
-                        +"reference in order e.g. [1 2] or [1 2 3] for position %d : ", i);
-                        anchorNumber = input(anchorNumberPrompt);
-                    end    
-                    distanceFromAnchorPrompt = sprintf("\t Enter distance "...
-                    +"of tag from those anchor in same order [d1 d2] or [d1 d2 d3] for position %d : ", i);
-                    distanceFromAnchor = input(distanceFromAnchorPrompt);
-                    coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
-                    x_true(i) = coordinates(1);
-                    y_true(i) = coordinates(2);       
-                end    
-            end
         end 
 
         posAnchor = zeros(1,2*length(x_anch_pos));
@@ -101,7 +69,7 @@ function collectAndPlot()
             WritePosFile(positions,duration);
         end
         
-        GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
+        %GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
     
    catch ME
        
@@ -123,7 +91,7 @@ function WritePosFile(positions,duration)
         fileName="pos"+string(i)+".txt";
         disp(fileName);
         fileID = fopen(fileName,'w');
-        pause(60);
+        pause(20);
         k=1;
         tStart=tic;%starts the timer
         flush(s);
@@ -156,6 +124,40 @@ end
 
 function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
     global expName;
+    %Getting coordinates of positions 
+    method = input("Do you have actual coordinates of positions?(Y/N) ",'s');
+    if(strcmpi(method,"Y"))
+        for i = 1:positions 
+        xPrompt = sprintf("\t Enter x coordinate of Position %d :", i);
+        x_true(i) = input(xPrompt);
+        yPrompt = sprintf("\t Enter y coordinate of Position %d :", i);
+        y_true(i) = input(yPrompt);     
+        end 
+
+    elseif(strcmpi(method,"N"))
+        disp("We will be using triangulation for getting coordinates.")
+
+        allSame = input("Do you plan to use same anchors for reference?(Y/N) ",'s');
+        if(strcmpi(allSame,"Y"))
+            anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
+                +"reference in order e.g. [1 2] or [1 2 3] for positions: ");
+            anchorNumber = input(anchorNumberPrompt);                    
+        end
+
+        for i = 1:positions
+            if(strcmpi(allSame,"N"))
+                anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
+                +"reference in order e.g. [1 2] or [1 2 3] for position %d : ", i);
+                anchorNumber = input(anchorNumberPrompt);
+            end    
+            distanceFromAnchorPrompt = sprintf("\t Enter distance "...
+            +"of tag from those anchor in same order [d1 d2] or [d1 d2 d3] for position %d : ", i);
+            distanceFromAnchor = input(distanceFromAnchorPrompt);
+            coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
+            x_true(i) = coordinates(1);
+            y_true(i) = coordinates(2);       
+        end    
+    end
     cd (expName)
     dinfo = dir('pos*.txt');
     filenames = {dinfo.name};
@@ -394,7 +396,7 @@ cd(expName);
 if ~strcmp(status,"FT")
     delete("*.mat")
     delete("*.png")
-    delete("*.txt")
+    %delete("*.txt")
 end
 cd ..
 clear;
