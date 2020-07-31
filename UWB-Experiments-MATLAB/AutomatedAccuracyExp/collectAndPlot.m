@@ -24,11 +24,23 @@ function collectAndPlot()
             load(expName+"/LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
             
         elseif(strcmpi(existingValues,"N"))
+            
+             uiwait(msgbox('Please confirm if you have completed position congiguration for anchorrs',...
+            'Anchor Setup Confirmation!!!!','warn'));
+        
             %Getting number of the positions
             positions = input("Enter the number of positions: ");
             
             %Getting time duration of positioning data collection, in minutes
-            duration = input("Enter the time duration in minutes for each position: ");
+            duration = input("Enter the time duration in minutes for each position (in mins): ");
+            
+            %Getting time in seconds after which recording starts
+            waitTime = input("Enter the time duration to wait before recording starts (in secs): ");
+            
+            
+            %Getting time to verify reader operation 
+            readerCheckTime = input("Enter the listener testing time (in secs): ");
+            
 
             %Getting number of anchors
             anchNumber = input("Enter the number of UWB anchors: ");
@@ -47,10 +59,6 @@ function collectAndPlot()
                 yPrompt = sprintf("\t Enter y coordinate of anchor %d :", i);
                 y_anch_pos(i) = input(yPrompt);        
             end
-
-
-
-
         end 
 
         posAnchor = zeros(1,2*length(x_anch_pos));
@@ -61,17 +69,19 @@ function collectAndPlot()
         posTag(1:2:end) = x_true;posTag(2:2:end) = y_true;
         fprintf("\n\n Position of tag(s) in order " ); disp(1:1:length(x_true));
         fprintf("\t(%0.2f,%0.2f)\n",posTag);
+        
         % Ask the tester to double check anchor's location
         uiwait(msgbox(sprintf('Confirm Anchor Location: (x=%0.2f,y=%0.2f)\n', ...
             posAnchor),'Anchor Setup Confirmation','warn'));
-        uiwait(msgbox('Make Sure You Set Up Each Anchor!',...
-            'Anchor Setup Confirmation','warn'));
+        
         % Writing files for the Positions
         if(~strcmpi(existingValues,"Y"))
-            WritePosFile(positions,duration);
+            initialpos=1;
+            flag=0;
+            WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,flag);
         end
         
-        %GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
+        GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
     
    catch ME
        
@@ -84,52 +94,63 @@ function collectAndPlot()
 
 end
 
-function WritePosFile(positions,duration)
+function WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,flag)
     global expName;
     serialPort = input("Enter the serial port name (string): ",'s');
     s=serialport(serialPort,115200,"Timeout",30);
+    
     % Check if the serial port has bytes available. 
     % If not, the listener might not be properly set up
-    fprintf("Checking the status of %s\n",serialPort);
-    initSerialIncomingBytes = s.NumBytesAvailable;
-    delayTimer(5); %TODO: Change this 5 seconds adaptive to user-set update rate
-    if(initSerialIncomingBytes == s.NumBytesAvailable)
-        ME = MException('Serialport:NoBytesAvailable', ...
-        'Listener Not in Reporting Mode');
-        beep;
-        throw(ME);
-    else
-        fprintf("Status of %s is healthy, data recording\n\n",serialPort);
-        mkdir (expName)
-        cd (expName)
-        for i = linspace(1,positions,positions)
-            fileName="pos"+string(i)+".txt";
-            disp(fileName+' ' + 'collecting in progress');
-            fileID = fopen(fileName,'w');
-            delayTimer(20);
-            k = 1;
-            tStart=tic;%starts the timer
-            flush(s);
-            while(true)
-                data = readline(s);
-                fprintf(fileID,data+"\n");
-                if(toc(tStart)>duration*60)
-                    disp("Done with the file");
-                    while(i~=positions)
-                        confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
-                        if(confirmation=="Y"||confirmation=="y")
-                            break;
-                        else
-                            continue;
-                        end   
+ 
+    try  
+        if(flag==0)
+            mkdir (expName)
+            cd (expName)
+        end            
+        for i = linspace(initialpos,positions,(positions-initialpos)+1)          
+            fprintf("Checking the status of %s\n",serialPort);
+            initSerialIncomingBytes = s.NumBytesAvailable;
+            delayTimer(readerCheckTime);
+            if(initSerialIncomingBytes == s.NumBytesAvailable)
+                ME = MException('Serialport:NoBytesAvailable', ...
+                'Listener Not in Reporting Mode');
+                beep;
+                throw(ME);
+            else
+                fprintf("Status of %s is healthy, data recording after wait time is over\n\n",serialPort);
+                fileName="pos"+string(i)+".txt";
+                disp(fileName+' ' + 'collecting in progress');
+                fileID = fopen(fileName,'w');
+                delayTimer(waitTime);
+                tStart=tic;%starts the timer
+                flush(s);
+                while(true)
+                    data = readline(s);
+                    fprintf(fileID,data+"\n");
+                    if(toc(tStart)>duration*60)
+                        disp("Done with the file");
+                        while(i~=positions)
+                            confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
+                            if(confirmation=="Y"||confirmation=="y")
+                                break;
+                            else
+                                continue;
+                            end   
+                        end
+                        break;
                     end
-                    break;
                 end
-                k = k+1;
-            end
+            end 
+        end
+    catch ME
+        if(strcmp(ME.identifier,'Serialport:NoBytesAvailable'))
+        uiwait(msgbox('Please check the location of listener with respect to tag',...
+            'Reader Data Error!!!!','error'));
+        flag=flag+1;
+        disp(flag)
+        WritePosFile(i,positions,duration,waitTime,readerCheckTime,flag)
         end
         
-    % TODO: Catch it here if any com port problems  
     end
     fclose("all");
     cd ..
@@ -144,7 +165,7 @@ function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
     %Getting coordinates of positions 
     method = input("Do you have actual coordinates of positions?(Y/N) ",'s');
     if(strcmpi(method,"Y"))
-        for i = 1:positions 
+        for i = 1:size(x_true,2)
         xPrompt = sprintf("\t Enter x coordinate of Position %d :", i);
         x_true(i) = input(xPrompt);
         yPrompt = sprintf("\t Enter y coordinate of Position %d :", i);
@@ -161,7 +182,7 @@ function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
             anchorNumber = input(anchorNumberPrompt);                    
         end
 
-        for i = 1:positions
+        for i = 1:size(x_true,2)
             if(strcmpi(allSame,"N"))
                 anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
                 +"reference in order e.g. [1 2] or [1 2 3] for position %d : ", i);
