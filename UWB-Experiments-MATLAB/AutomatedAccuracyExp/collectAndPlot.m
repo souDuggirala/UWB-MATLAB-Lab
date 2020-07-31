@@ -92,10 +92,11 @@ function WritePosFile(positions,duration)
     % If not, the listener might not be properly set up
     fprintf("Checking the status of %s\n",serialPort);
     initSerialIncomingBytes = s.NumBytesAvailable;
-    pause(5); %TODO: Change this 5 seconds adaptive to user-set update rate
+    delayTimer(5); %TODO: Change this 5 seconds adaptive to user-set update rate
     if(initSerialIncomingBytes == s.NumBytesAvailable)
         ME = MException('Serialport:NoBytesAvailable', ...
         'Listener Not in Reporting Mode');
+        beep;
         throw(ME);
     else
         fprintf("Status of %s is healthy, data recording\n\n",serialPort);
@@ -105,7 +106,7 @@ function WritePosFile(positions,duration)
             fileName="pos"+string(i)+".txt";
             disp(fileName+' ' + 'collecting in progress');
             fileID = fopen(fileName,'w');
-            pause(20);
+            delayTimer(20);
             k = 1;
             tStart=tic;%starts the timer
             flush(s);
@@ -128,7 +129,7 @@ function WritePosFile(positions,duration)
             end
         end
         
-        
+    % TODO: Catch it here if any com port problems  
     end
     fclose("all");
     cd ..
@@ -400,6 +401,24 @@ function ax = computeAxisLim(x_anch,y_anch)
     ax(3) = min(y_anch)-5;
     ax(4) = max(y_anch)+5;
 end
+
+function delayTimer(delayInSec)
+    % UI function to display elapsed time in dots
+    totalTasks = 50;
+    period = delayInSec / totalTasks;
+    T = timer('Period',period,...       %period
+    'ExecutionMode','fixedRate',...     %{singleShot,fixedRate,fixedSpacing,fixedDelay}
+    'BusyMode','drop',...               %{drop, error, queue}
+    'TasksToExecute',totalTasks,...
+    'StartDelay',0,...
+    'TimerFcn',@(src,evt)fprintf(1,'.'),...
+    'StartFcn',@(src,evt)fprintf(1,'\n'),...
+    'StopFcn',@(src,evt)fprintf(1,'\n'),...
+    'ErrorFcn',[]);
+    start(T);
+    pause(delayInSec);
+end
+
 
 function myCleanup()
 global expName status
