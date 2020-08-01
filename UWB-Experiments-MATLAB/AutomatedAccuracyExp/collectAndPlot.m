@@ -65,10 +65,11 @@ function collectAndPlot()
         posAnchor(1:2:end) = x_anch_pos;posAnchor(2:2:end) = y_anch_pos;
         fprintf("\n\n Position of archors in order " ); disp(1:1:length(x_anch_pos));
         fprintf("\t(%0.2f,%0.2f)\n",posAnchor);
-        posTag = zeros(1,2*length(x_true));
-        posTag(1:2:end) = x_true;posTag(2:2:end) = y_true;
-        fprintf("\n\n Position of tag(s) in order " ); disp(1:1:length(x_true));
-        fprintf("\t(%0.2f,%0.2f)\n",posTag);
+        
+        serialPort = input("Enter the serial port name (string): ",'s');
+        s=serialport(serialPort,115200,"Timeout",30);
+        mkdir (expName)
+        cd (expName)
         
         % Ask the tester to double check anchor's location
         uiwait(msgbox(sprintf('Confirm Anchor Location: (x=%0.2f,y=%0.2f)\n', ...
@@ -78,7 +79,7 @@ function collectAndPlot()
         if(~strcmpi(existingValues,"Y"))
             initialpos=1;
             flag=0;
-            WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,flag);
+            WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
         end
         
         GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
@@ -94,38 +95,29 @@ function collectAndPlot()
 
 end
 
-function WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,flag)
-    global expName;
-    serialPort = input("Enter the serial port name (string): ",'s');
-    s=serialport(serialPort,115200,"Timeout",30);
-    
-    % Check if the serial port has bytes available. 
-    % If not, the listener might not be properly set up
- 
+function WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,sP,flag)
     try  
-        if(flag==0)
-            mkdir (expName)
-            cd (expName)
-        end            
+        disp(initialpos + " " + positions);
         for i = linspace(initialpos,positions,(positions-initialpos)+1)          
-            fprintf("Checking the status of %s\n",serialPort);
-            initSerialIncomingBytes = s.NumBytesAvailable;
+            fprintf("Checking the status of serial port\n");
+            initSerialIncomingBytes = sP.NumBytesAvailable;
+            flush(sP);
             delayTimer(readerCheckTime);
-            if(initSerialIncomingBytes == s.NumBytesAvailable)
+            if(initSerialIncomingBytes == sP.NumBytesAvailable)
                 ME = MException('Serialport:NoBytesAvailable', ...
                 'Listener Not in Reporting Mode');
                 beep;
                 throw(ME);
             else
-                fprintf("Status of %s is healthy, data recording after wait time is over\n\n",serialPort);
+                fprintf("Status of serial port is healthy, data recording after wait time is over\n\n");
                 fileName="pos"+string(i)+".txt";
                 disp(fileName+' ' + 'collecting in progress');
                 fileID = fopen(fileName,'w');
                 delayTimer(waitTime);
                 tStart=tic;%starts the timer
-                flush(s);
+                flush(sP);
                 while(true)
-                    data = readline(s);
+                    data = readline(sP);
                     fprintf(fileID,data+"\n");
                     if(toc(tStart)>duration*60)
                         disp("Done with the file");
@@ -148,12 +140,14 @@ function WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,fla
             'Reader Data Error!!!!','error'));
         flag=flag+1;
         disp(flag)
-        WritePosFile(i,positions,duration,waitTime,readerCheckTime,flag)
+        WritePosFile(i,positions,duration,waitTime,readerCheckTime,sP,flag)
+        else
+            rethrow(ME)
         end
+        
         
     end
     fclose("all");
-    cd ..
 end
 
 
