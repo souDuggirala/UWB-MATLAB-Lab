@@ -114,6 +114,9 @@ function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
     Yerror=zeros(1,1);
     dinfo = dir('pos*.txt');
     filenames = {dinfo.name};
+    disp(filenames);
+    %TODO: change the ordering mechanism when file name numbers reaches 2
+    %or more digits
     x_tag_pos_avg=zeros(1,length(filenames));
     y_tag_pos_avg=zeros(1,length(filenames));
     x_tag_pos_std=zeros(1,length(filenames));
