@@ -139,12 +139,14 @@ function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
     end
     
     figure();
-    histogram(Xerror);
-    xlabel('Errors in X coordinate (m)');
+    histfit(Xerror);
+    title("Error distribution on X axis",'FontSize',12)
+    xlabel('Errors in X coordinate (m)','FontSize',12);
     figure();
     saveas(gcf,'XERROR.png');
-    histogram(Yerror);
-    xlabel('Errors in Y coordinate (m)');
+    histfit(Yerror);
+    title("Error distribution on Y axis",'FontSize',12)
+    xlabel('Errors in Y coordinate (m)','FontSize',12);
     saveas(gcf,'YERROR.png');
     save('Error','Xerror','Yerror');
     save("LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
@@ -172,6 +174,8 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     ax=gca;
     ax.XTickMode = 'auto';
     ax.YTickMode = 'auto';
+    ax.XAxis.FontSize = 15;
+    ax.YAxis.FontSize = 15;
     hold on;
     % Plot the dummy handles for legend
     std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
@@ -217,7 +221,7 @@ function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     grid on;
     l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
         'True Position','Measured Position','Standard Deviation (Oval)',...
-        'Anchor', 'Accuracy Buffer (±0.1m)',"Linewidth",1.5);
+        'Anchor', 'Accuracy Buffer (±0.1m)',"Linewidth",1.5,'FontSize',12);
     set(l, 'Location', 'southeast');
     title(title_name);
     xlabel('X coordinate (m)');
@@ -272,14 +276,15 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
         hold on
     end
     daspect([1 1 1]);
-    grid on;
-    l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor',"Linewidth",1.5);
-    set(l, 'Location', 'southeast');
     axis(axs);
+    grid on;
+    l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (±0.1m)','Anchor',"Linewidth",1.5,'FontSize',12);
+    set(l, 'Location', 'southeast');
     title(title_name);
+    ax.XAxis.FontSize = 15;
+    ax.YAxis.FontSize = 15;
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
-    legend boxon
     hold off;
     saveas(gcf,'pos_errorbar.png')
     
