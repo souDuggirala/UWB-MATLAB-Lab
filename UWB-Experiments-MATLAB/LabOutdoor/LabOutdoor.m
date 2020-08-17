@@ -338,13 +338,13 @@ end
 
 
 function myCleanup()
-global expName status
-fprintf('\n Close ALL \n');
-fclose("all");
-if ~strcmp(status,"FT")    
-    delete(expName+"/*.mat")
-    delete(expName+"/*.png")
-end
-clear;
-cd ..
+    global expName status
+    fprintf('\n Close ALL \n');
+    fclose("all");
+    if ~strcmp(status,"FT")    
+        delete(expName+"/*.mat")
+        delete(expName+"/*.png")
+    end
+    clear;
+    cd ..
 end
