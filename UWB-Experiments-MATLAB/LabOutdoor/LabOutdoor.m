@@ -138,6 +138,8 @@ function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
         y_tag_pos_std(1,K) = stdPos1(1,2);
     end
     
+    disp("X, Y Norm Dist Values: mean and std: ");
+    disp([mean(Xerror), mean(Yerror), stdPos1]);
     figure();
     histfit(Xerror);
     title("Error distribution on X axis",'FontSize',12)
@@ -150,10 +152,10 @@ function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
     saveas(gcf,'YERROR.png');
     save('Error','Xerror','Yerror');
     save("LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
-pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
-    x_anch_pos, y_anch_pos, expName);
-pos_errorbar(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
-    x_anch_pos, y_anch_pos, expName);
+    pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
+        x_anch_pos, y_anch_pos, expName);
+    pos_errorbar(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
+        x_anch_pos, y_anch_pos, expName);
 end
 
 
