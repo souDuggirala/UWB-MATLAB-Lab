@@ -82,7 +82,17 @@ function collectAndPlot()
             WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
         end
         
-        GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
+        %Skip ploting if we don't want it write now 
+        skipOrNot = input("Do you want to plot data rightnow?(Y/N) ",'s');
+        
+        if(strcmpi(skipOrNot,"Y"))
+             GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
+        else
+            disp("Moving files to LaoOutdoor directory for future ploting")
+            movefile(expName,'../LabOutdoor');
+        end
+        
+       
     
    catch ME
        
