@@ -1,42 +1,41 @@
 function RealTimePlotWithMQTT()
-M = mqtt('tcp://172.16.46.92');
 cleanup = onCleanup(@()myCleanup(M));
-x_anch=[0,0,2.33,2.33];
-y_anch=[0,1.11,1.11,0];
-figure();
-box on;
-set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
-plot(x_anch, y_anch, 'r^');
-axis([-0.5 10 -0.5 2.5]);
-daspect([1 1 1]);
-grid on;
-hold on;
+x_anch=[0,7.4,7.4,0];
+y_anch=[0,0,7.4,7.4];
+count = 0;
+temp=0;
+M = mqtt('tcp://192.168.201.70');
+mysub = subscribe(M,'dwm/node/d605/uplink/location');
+pause(1);
 while (1)
-    M = mqtt('tcp://172.16.46.92');
-    mysub = subscribe(M,'dwm/node/47a3/uplink/location');
-    pause(0.8);
-    if(mysub.MessageCount==0)
-        disp("No Message to read");
-    else
         msg = read(mysub);
         position = jsondecode(msg);
-        check = geofencing(position.position.x,position.position.y);
-        if(check)
-            disp("OUT OF ZONE")
+        if(count~=0)
+            if (temp==position.superFrameNumber)
+               disp("Value Not updated") 
+               
+            else
+                disp( count + " " + position.position.x + " " + position.position.y)    
+                if(~(strcmp(position.position.x,"NaN")&&strcmp(position.position.y,"NaN")))
+                    check = geofencing(position.position.x,position.position.y);
+                    if(check)
+                        disp("OUTSIDE" + " " + position.position.x + " " + position.position.y)
+                    end
+                end
+            end
         end
-        plot(position.position.x,position.position.y, 'b^');
-        hold on
-    end
-
+        count = count+1;
+        temp = position.superFrameNumber;
+        disp(position.superFrameNumber)
+        pause(0.1)
 end
-
 end
 
 
 
 function check = geofencing(X,Y)
 check = false;
-if ((X < 0) || (Y < 0)|| (X > 6.33)|| (Y>6.33))
+if ((X < 1) || (Y < 1)|| (X > 7.0)|| (Y>7.0))
    check=true; 
 end
 end
