@@ -3,17 +3,22 @@ function CrossCompare()
     filenames = {dinfo.name};
     XerrorABS = zeros(1,1);
     YerrorABS = zeros(1,1);
-    figure();
+    figure(1);
+    figure(2);
     for i=1:length(filenames)
         load(filenames(i)+"/Error","Xerror", "Yerror");
         XerrorABS = Xerror;
         %XerrorABS = abs(Xerror);
         x = linspace(min(XerrorABS),max(XerrorABS));
         xmean = mean(XerrorABS);
-        xsd = std(XerrorABS); 
+        xsd = std(XerrorABS);
+        figure(1);
+        hold on;
         cdfplot(XerrorABS);
-        %hold on;
-        %plot(x,evcdf(x,xmean,xsd),"+-");
+        
+        figure(2);
+        hold on;
+        plot(x,evcdf(x,xmean,xsd),"+-");
         %YerrorABS = abs(Yerror);
         hold on;
     end
