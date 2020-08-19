@@ -6,13 +6,14 @@ function CrossCompare()
     figure();
     for i=1:length(filenames)
         load(filenames(i)+"/Error","Xerror", "Yerror");
-        XerrorABS = abs(Xerror);
+        XerrorABS = Xerror;
+        %XerrorABS = abs(Xerror);
         x = linspace(min(XerrorABS),max(XerrorABS));
         xmean = mean(XerrorABS);
         xsd = std(XerrorABS); 
-        %cdfplot(XerrorABS);
+        cdfplot(XerrorABS);
         %hold on;
-        plot(x,evcdf(x,xmean,xsd),"b+-");
+        %plot(x,evcdf(x,xmean,xsd),"+-");
         %YerrorABS = abs(Yerror);
         hold on;
     end
