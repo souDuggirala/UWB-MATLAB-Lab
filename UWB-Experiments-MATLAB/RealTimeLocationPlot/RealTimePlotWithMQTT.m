@@ -4,7 +4,7 @@ x_anch=[0,7.4,7.4,0];
 y_anch=[0,0,7.4,7.4];
 count = 0;
 temp=0;
-M = mqtt('tcp://192.168.201.70');
+M = mqtt('tcp://172.16.46.92');
 mysub = subscribe(M,'dwm/node/d605/uplink/location');
 pause(1);
 while (1)
