@@ -82,7 +82,7 @@ def get_sys_info(serialport):
     pan_id = re.search("(?<=uwb0\:\spanid=)(.{5})(?=\saddr=)", si).group(0)
     sys_info["pan_id"] = pan_id
     # Device ID in hexadecimal
-    device_id = re.search("(?<=panid=.{6}addr=)(.{17})(?=\\\\r\\\\n)", si).group(0)
+    device_id = re.search("(?<=panid=.{6}addr=)(.{17})", si).group(0)
     sys_info["device_id"] = device_id
     # Update rate of location reporting in int
     upd_rate = re.search("(?<=upd_rate_stat=)(.*)(?=\slabel=)",si).group(0)
