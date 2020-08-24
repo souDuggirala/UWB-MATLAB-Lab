@@ -2,9 +2,12 @@ import os, platform, sys
 
 import serial, glob, re
 import time
+from datetime import datetime
 
 import subprocess
 import paho.mqtt.client as mqtt
+
+import json
 
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
@@ -90,6 +93,30 @@ def get_sys_info(serialport):
 
     return sys_info
 
+def make_json_dic(raw_string):
+    # sample input:
+    # les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
+    # lep\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
+    # lec\n: POS,7.10,5.24,-2.03,53
+    data = {}
+    # parse csv
+    raw_elem = raw_string.split(',')
+    num_anc = int(raw_elem[1])
+    data['anc_num'] = int(raw_elem[1])
+    for i in range(num_anc):
+        data[raw_elem[2+6*i]] = {}
+        data[raw_elem[2+6*i]]['anc_id'] = raw_elem[2+6*i+1]
+        data[raw_elem[2+6*i]]['x'] = float(raw_elem[2+6*i+2])
+        data[raw_elem[2+6*i]]['y'] = float(raw_elem[2+6*i+3])
+        data[raw_elem[2+6*i]]['z'] = float(raw_elem[2+6*i+4])
+        data[raw_elem[2+6*i]]['dist_to'] = float(raw_elem[2+6*i+5])
+    data['est_pos'] = {}
+    data['est_pos']['x'] = float(raw_elem[-4])
+    data['est_pos']['y'] = float(raw_elem[-3])
+    data['est_pos']['z'] = float(raw_elem[-2])
+    data['est_qual'] = float(raw_elem[-1])
+    return data
+
 
 if __name__ == "__main__":
     com_ports = get_tag_serial_port()
@@ -118,13 +145,16 @@ if __name__ == "__main__":
     assert is_reporting_loc(t, timeout=upd_rate/10)
     
     # location data flow is confirmed. Start publishing to localhost (MQTT)
-    print("Connecting to Broker...")
+    sys.stdout.write("["+str(datetime.utcnow().strftime('%H:%M:%S.%f'))+"] Connecting to Broker...\n")
     tag_client = mqtt.Client("Tag:"+tag_id)
     # tag_client.on_publish = mqtt_on_publish
     tag_client.connect(MQTT_BROKER, MQTT_PORT)
-
+    sys.stdout.write("["+str(datetime.utcnow().strftime('%H:%M:%S.%f'))+"] Connected to Broker! Publishing\n")
     t.reset_input_buffer()
     while True:
         data = str(t.readline(), encoding="UTF-8").rstrip()
-        tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), data)
+        json_dic = make_json_dic(data)
+        json_dic['tag_id'] = tag_id
+        json_data = json.dumps(json_dic)
+        tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data)
     t.close()
