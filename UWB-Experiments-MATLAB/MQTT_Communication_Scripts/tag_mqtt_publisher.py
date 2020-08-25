@@ -47,7 +47,7 @@ def get_tag_serial_port():
         # the UART between RPi adn DWM1001-Dev is designated as serial0
         # with the drivers installed. 
         # see Section 4.3.1.2 of DWM1001-Firmware-User-Guide
-        if "raspberrypi" in os.uname():
+        if re.search("raspberrypi", str(os.uname())):
             ports += ["/dev/serial0"]
         else:
             ports += glob.glob('/dev/tty[A-Za-z]*')
@@ -156,6 +156,8 @@ if __name__ == "__main__":
     while True:
         try:
             data = str(t.readline(), encoding="UTF-8").rstrip()
+            if not data[:4] == "DIST":
+                continue
             json_dic = make_json_dic(data)
             json_dic['tag_id'] = tag_id
             json_dic['superFrameNumber'] = super_frame
@@ -163,6 +165,7 @@ if __name__ == "__main__":
             tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
             super_frame += 1
         except Exception as exp:
-            sys.stdout.write("["+str(datetime.utcnow().strftime('%H:%M:%S.%f'))+"] " + data + "\n")
+            sys.stdout.write("["+str(datetime.utcnow().strftime('%H:%M:%S.%f'))+"] " + data)
             raise exp
+
     t.close()
