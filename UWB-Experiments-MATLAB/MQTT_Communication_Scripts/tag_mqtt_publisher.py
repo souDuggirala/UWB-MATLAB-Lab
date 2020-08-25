@@ -154,11 +154,15 @@ if __name__ == "__main__":
 
     super_frame = 0
     while True:
-        data = str(t.readline(), encoding="UTF-8").rstrip()
-        json_dic = make_json_dic(data)
-        json_dic['tag_id'] = tag_id
-        json_dic['superFrameNumber'] = super_frame
-        json_data = json.dumps(json_dic)
-        tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data)
-        super_frame += 1
+        try:
+            data = str(t.readline(), encoding="UTF-8").rstrip()
+            json_dic = make_json_dic(data)
+            json_dic['tag_id'] = tag_id
+            json_dic['superFrameNumber'] = super_frame
+            json_data = json.dumps(json_dic)
+            tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
+            super_frame += 1
+        except Exception as exp:
+            sys.stdout.write("["+str(datetime.utcnow().strftime('%H:%M:%S.%f'))+"] " + data + "\n")
+            raise exp
     t.close()
