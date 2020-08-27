@@ -4,7 +4,7 @@ import serial, glob, re
 import time
 from datetime import datetime
 
-import subprocess
+import subprocess, atexit, signal
 import paho.mqtt.client as mqtt
 
 import json
@@ -12,12 +12,28 @@ import json
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 
+def timestamp_log(incl_UTC=True):
+    """ Get the timestamp for the stdout log message
+        
+        :returns:
+            string format local timestamp with option to include UTC 
+    """
+    local_timestp = "["+str(datetime.now().strftime('%H:%M:%S.%f'))+" local] "
+    utc_timestp = "["+str(datetime.utcnow().strftime('%H:%M:%S'))+" UTC] "
+    if incl_UTC:
+        return local_timestp + utc_timestp
+    else:
+        return local_timestp
+
 def mqtt_on_publish(client, data, result):
+    # TODO: Define actions to take if mqtt_on_publish is needed
     pass
 
 def is_reporting_loc(serialport, timeout=2):
     """ Detect if the DWM1001 Tag is running on data reporting mode
-        :returns: True or False
+        
+        :returns:
+            True or False
     """
     init_bytes_avail = serialport.in_waiting
     time.sleep(timeout)
@@ -28,7 +44,22 @@ def is_reporting_loc(serialport, timeout=2):
     time.sleep(0.1)
     return False
 
-def get_tag_serial_port():
+def is_uwb_shell_ok(serialport):
+    """ Detect if the DWM1001 Tag's shell console is responding to \x0D\x0D
+        
+        :returns:
+            True or False
+    """
+    serialport.reset_input_buffer()
+    serialport.write(b'\x0D\x0D')
+    time.sleep(0.1)
+    sys.stdout.write(str(serialport.read(serialport.in_waiting))+'\n')
+    if serialport.in_waiting:
+        return True
+    else:
+        return False
+
+def get_tag_serial_port(verbose=False):
     """ Detect the serial port name of DWM1001 Tag
 
         :raises EnvironmentError:
@@ -36,6 +67,8 @@ def get_tag_serial_port():
         :returns:
             return DWM1001 tag serial port name and make sure it is closed
     """
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Fetching serialport...\n")
     ports = []
     import serial.tools.list_ports
     if sys.platform.startswith('win'):
@@ -61,14 +94,18 @@ def get_tag_serial_port():
             s.close()
         except:
             raise ConnectionError("Wrong serial port detected for UWB tag")
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Serialport fetched as: " + str(ports))
     return ports
 
-def get_sys_info(serialport):
+def get_sys_info(serialport, verbose=False):
     """ Get the system config information of the tag device through UART
 
         :returns:
             Dictionary of system information
     """
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Fetching system information of UWB...\n")
     sys_info = {}
     if is_reporting_loc(serialport):
         serialport.write(b'\x6C\x65\x63\x0D')
@@ -77,10 +114,10 @@ def get_sys_info(serialport):
     serialport.reset_input_buffer()
     serialport.write(b'\x73\x69\x0D')
     time.sleep(0.1)
-    # TODO parse the ID of the tag
     si = str(serialport.read(serialport.in_waiting))
     serialport.reset_input_buffer()
-    
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Raw system info fetched as: \n" + si + "\n")
     # PANID in hexadecimal
     pan_id = re.search("(?<=uwb0\:\spanid=)(.{5})(?=\saddr=)", si).group(0)
     sys_info["pan_id"] = pan_id
@@ -90,7 +127,7 @@ def get_sys_info(serialport):
     # Update rate of location reporting in int
     upd_rate = re.search("(?<=upd_rate_stat=)(.*)(?=\slabel=)",si).group(0)
     sys_info["upd_rate"] = int(upd_rate)
-
+    
     return sys_info
 
 def make_json_dic(raw_string):
@@ -117,17 +154,77 @@ def make_json_dic(raw_string):
     data['est_qual'] = float(raw_elem[-1])
     return data
 
+def on_exit(serialport, verbose=False):
+    """ On exit callbacks to make sure the serialport is closed when
+        the program ends.
+    """
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serialport.port))
+    serialport.close()
+
+def available_ttys(portlist):
+    """ Generator to yield all available ports that are not locked by flock.
+        Filters out the ports that are already opened. Preventing the program
+        from running on multilple processes.
+        
+        Notice: if the other processes don't use flock, that process(es) will
+        still be able to open the port, skipping the flock protection.
+        
+        Only works for POSIX/LINUX environment. 
+        
+        :yield:timestamp_log() + "Port is busy\n"
+            Comports that aren't locked by flock.
+    """
+    for tty in portlist:
+        try:
+            port = serial.Serial(port=tty[0])
+            if port.isOpen():
+                try:
+                    fcntl.flock(port.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except (IOError, BlcokingIOError):
+                    sys.stdout.write(timestamp_log() + "Port is busy\n")
+                else:
+                    yield port
+        except serial.SerialException as ex:
+            print('Port {0} is unavailable: {1}'.format(tty, ex))
+
 
 if __name__ == "__main__":
+    sys.stdout.write('\n\n')
+    sys.stdout.write(timestamp_log() + "MQTT publisher service started. PID: {}\n".format(os.getpid()))
     com_ports = get_tag_serial_port()
     tagport = com_ports.pop()
     assert len(com_ports) == 0
+    
     # In Python the readline timeout is set in the serialport init part
     t = serial.Serial(tagport, baudrate=115200, timeout=3.0)
+    if sys.platform.startswith('linux'):
+        import fcntl
+        try:
+            fcntl.flock(t.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, BlockingIOError) as exp:
+            sys.stdout.write(timestamp_log() + "Port is busy. Another process is accessing the port. \n")
+            raise exp
+        else:
+            sys.stdout.write(timestamp_log() + "Port is ready.\n")
+        
+        
+    def on_killed(signum, frame):
+        """ Closure function as handler to signal.signal in order to pass serialport name
+        """
+        # if killed by UNIX, no need to execute on_exit callback
+        atexit.unregister(on_exit)
+        sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(t.port))
+        t.close()
+    # register the callback functions when the service ends
+    # atexit for regular exit, signal.signal for system kills    
+    atexit.register(on_exit, t, True)
+    signal.signal(signal.SIGTERM, on_killed)
     # Pause for 1 sec after establishment
-    time.sleep(0.5)
+    time.sleep(0.1)
     # Double enter (carriage return) as specified by Decawave
     t.write(b'\x0D\x0D')
+    time.sleep(0.1)
     t.reset_input_buffer()
 
     # By default the update rate is 10Hz/100ms. Check again for data flow
@@ -136,7 +233,7 @@ if __name__ == "__main__":
         t.write(b'\x6C\x65\x63\x0D')
         time.sleep(0.1)
 
-    sys_info = get_sys_info(t)
+    sys_info = get_sys_info(t, verbose=True)
     tag_id = sys_info.get("device_id") 
     upd_rate = sys_info.get("upd_rate") 
     # type "lec\n" to the dwm shell console to activate data reporting
@@ -145,11 +242,11 @@ if __name__ == "__main__":
     assert is_reporting_loc(t, timeout=upd_rate/10)
     
     # location data flow is confirmed. Start publishing to localhost (MQTT)
-    sys.stdout.write("["+str(datetime.utcnow().strftime('%H:%M:%S.%f'))+"] Connecting to Broker...\n")
+    sys.stdout.write(timestamp_log() + "Connecting to Broker...\n")
     tag_client = mqtt.Client("Tag:"+tag_id)
     # tag_client.on_publish = mqtt_on_publish
     tag_client.connect(MQTT_BROKER, MQTT_PORT)
-    sys.stdout.write("["+str(datetime.utcnow().strftime('%H:%M:%S.%f'))+"] Connected to Broker! Publishing\n")
+    sys.stdout.write(timestamp_log() + "Connected to Broker! Publishing\n")
     t.reset_input_buffer()
 
     super_frame = 0
@@ -165,7 +262,5 @@ if __name__ == "__main__":
             tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
             super_frame += 1
         except Exception as exp:
-            sys.stdout.write("["+str(datetime.utcnow().strftime('%H:%M:%S.%f'))+"] " + data)
+            sys.stdout.write(timestamp_log() + data)
             raise exp
-
-    t.close()
