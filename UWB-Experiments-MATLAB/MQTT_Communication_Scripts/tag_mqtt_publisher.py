@@ -12,14 +12,14 @@ import json
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 
-def timestamp_log(incl_UTC=True):
+def timestamp_log(incl_UTC=False):
     """ Get the timestamp for the stdout log message
         
         :returns:
             string format local timestamp with option to include UTC 
     """
-    local_timestp = "["+str(datetime.now().strftime('%H:%M:%S.%f'))+" local] "
-    utc_timestp = "["+str(datetime.utcnow().strftime('%H:%M:%S'))+" UTC] "
+    local_timestp = "["+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))+" local] "
+    utc_timestp = "["+str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))+" UTC] "
     if incl_UTC:
         return local_timestp + utc_timestp
     else:
@@ -114,10 +114,11 @@ def get_sys_info(serialport, verbose=False):
     serialport.reset_input_buffer()
     serialport.write(b'\x73\x69\x0D')
     time.sleep(0.1)
-    si = str(serialport.read(serialport.in_waiting))
+    byte_si = serialport.read(serialport.in_waiting)
+    si = str(byte_si)
     serialport.reset_input_buffer()
     if verbose:
-        sys.stdout.write(timestamp_log() + "Raw system info fetched as: \n" + si + "\n")
+        sys.stdout.write(timestamp_log() + "Raw system info fetched as: \n" + str(byte_si, encoding="UTF-8") + "\n")
     # PANID in hexadecimal
     pan_id = re.search("(?<=uwb0\:\spanid=)(.{5})(?=\saddr=)", si).group(0)
     sys_info["pan_id"] = pan_id
@@ -190,7 +191,6 @@ def available_ttys(portlist):
 
 
 if __name__ == "__main__":
-    sys.stdout.write('\n\n')
     sys.stdout.write(timestamp_log() + "MQTT publisher service started. PID: {}\n".format(os.getpid()))
     com_ports = get_tag_serial_port()
     tagport = com_ports.pop()
@@ -233,7 +233,7 @@ if __name__ == "__main__":
         t.write(b'\x6C\x65\x63\x0D')
         time.sleep(0.1)
 
-    sys_info = get_sys_info(t, verbose=True)
+    sys_info = get_sys_info(t)
     tag_id = sys_info.get("device_id") 
     upd_rate = sys_info.get("upd_rate") 
     # type "lec\n" to the dwm shell console to activate data reporting

@@ -17,7 +17,11 @@ if [ "$_IP" ]; then
   printf "My IP address is %s\n" "$_IP"
 fi
 
+# Cleanup the service log file
+> /home/pi/tag_pub_out.log
+# Make the script executable
 chmod +x /home/pi/tag_pub_service.sh
+# Start the MQTT publisher service at background
 sh /home/pi/tag_pub_service.sh &
 
 exit 0
