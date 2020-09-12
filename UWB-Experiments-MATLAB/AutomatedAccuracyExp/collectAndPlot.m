@@ -65,11 +65,7 @@ function collectAndPlot()
         posAnchor(1:2:end) = x_anch_pos;posAnchor(2:2:end) = y_anch_pos;
         fprintf("\n\n Position of archors in order " ); disp(1:1:length(x_anch_pos));
         fprintf("\t(%0.2f,%0.2f)\n",posAnchor);
-        
-        serialPort = input("Enter the serial port name (string): ",'s');
-        s=serialport(serialPort,115200,"Timeout",30);
-        mkdir (expName)
-        cd (expName)
+       
         
         % Ask the tester to double check anchor's location
         uiwait(msgbox(sprintf('Confirm Anchor Location: (x=%0.2f,y=%0.2f)\n', ...
@@ -79,7 +75,25 @@ function collectAndPlot()
         if(~strcmpi(existingValues,"Y"))
             initialpos=1;
             flag=0;
-            WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
+            modeOfDataCollection = input("What is mode of data collection?(SerialPort/MQTT) :",'s');
+            if(~strcmpi(modeOfDataCollection,"SerialPort"))
+                serialPort = input("Enter the serial port name (string): ",'s');
+                s=serialport(serialPort,115200,"Timeout",30);
+                mkdir (expName)
+                cd (expName)
+                WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
+            else
+                ipaddress = input("Enter the IP address for MQTT publisher tag(XXX.XX.XX.XX) :",'s');
+                tagId = inpur("Enter the tag ID :",'s');
+                tagId = tagId.lower;
+                tcp = 'tcp://';
+                tcp.append(ipaddress);
+                link = 'dwm/node/';
+                link.append(tagId).append('/uplink/location');
+                mQTT = mqtt(tcp); 
+                mysub = subscribe(mQTT,'dwm/node/d605/uplink/location');
+                WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,mysub,flag);
+            end
         end
         
         %Skip ploting if we don't want it write now 
@@ -105,7 +119,7 @@ function collectAndPlot()
 
 end
 
-function WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,sP,flag)
+function WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,sP,flag)
     try  
         disp(initialpos + " " + positions);
         for i = linspace(initialpos,positions,(positions-initialpos)+1)          
@@ -161,6 +175,62 @@ function WritePosFile(initialpos,positions,duration,waitTime,readerCheckTime,sP,
 end
 
 
+
+
+function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,msub,flag)
+    try  
+        disp(initialpos + " " + positions);
+        for i = linspace(initialpos,positions,(positions-initialpos)+1)          
+            fprintf("Checking the status of serial port\n");
+            initSerialIncomingBytes = msub.NumBytesAvailable;
+            flushinput(msub);
+            delayTimer(readerCheckTime);
+            if(initSerialIncomingBytes == msub.NumBytesAvailable)
+                ME = MException('Serialport:NoBytesAvailable', ...
+                'Listener Not in Reporting Mode');
+                beep;
+                throw(ME);
+            else
+                fprintf("Status of serial port is healthy, data recording after wait time is over\n\n");
+                fileName="pos"+string(i)+".txt";
+                disp(fileName+' ' + 'collecting in progress');
+                fileID = fopen(fileName,'w');
+                delayTimer(waitTime);
+                tStart=tic;%starts the timer
+                flush(msub);
+                while(true)
+                    data = readline(msub);
+                    fprintf(fileID,data+"\n");
+                    if(toc(tStart)>duration*60)
+                        disp("Done with the file");
+                        while(i~=positions)
+                            confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
+                            if(confirmation=="Y"||confirmation=="y")
+                                break;
+                            else
+                                continue;
+                            end   
+                        end
+                        break;
+                    end
+                end
+            end 
+        end
+    catch ME
+        if(strcmp(ME.identifier,'Serialport:NoBytesAvailable'))
+        uiwait(msgbox('Please check the location of listener with respect to tag',...
+            'Reader Data Error!!!!','error'));
+        flag=flag+1;
+        disp(flag)
+        WritePosFile(i,positions,duration,waitTime,readerCheckTime,msub,flag)
+        else
+            rethrow(ME)
+        end
+        
+        
+    end
+    fclose("all");
+end
 
 
 

@@ -1,36 +1,88 @@
 function RealTimePlotWithMQTT()
-cleanup = onCleanup(@()myCleanup(M));
-x_anch=[0,7.4,7.4,0];
-y_anch=[0,0,7.4,7.4];
-count = 0;
-temp=0;
-M = mqtt('tcp://172.16.46.92');
-mysub = subscribe(M,'dwm/node/d605/uplink/location');
-pause(1);
-while (1)
-        msg = read(mysub);
-        position = jsondecode(msg);
-        if(count~=0)
-            if (temp==position.superFrameNumber)
-               disp("Value Not updated") 
-               
-            else
-                disp( count + " " + position.position.x + " " + position.position.y)    
-                if(~(strcmp(position.position.x,"NaN")&&strcmp(position.position.y,"NaN")))
-                    check = geofencing(position.position.x,position.position.y);
-                    if(check)
-                        disp("OUTSIDE" + " " + position.position.x + " " + position.position.y)
+ip1 = 'tcp://192.168.200.133';
+ip2 = 'tcp://192.168.207.39';
+link = 'Tag/+/Uplink/Location';
+getData(ip1,ip2,link);
+cleanup = onCleanup(@()myCleanup());
+end
+
+
+function getData(ip1,ip2,link)
+M1=0;
+M2=0;
+ME = MException('myComponent:inputErrorMQTT', ...
+'Data received is not updated reconnecting');
+error = false;
+try 
+    disp("reached");
+    %M1 = mqtt(ip1);
+    M2 = mqtt(ip2);
+    %mysub1 = subscribe(M1,link);
+    mysub2 = subscribe(M2,link);
+    pause(1);
+    count = 0;
+    while (1)
+        disp(count)
+            %msg1 = read(mysub1);
+            msg2 = read(mysub2);
+            %position1 = jsondecode(msg1);
+            position2 = jsondecode(msg2);
+            %tag1=extractBetween(position1.tag_id,strlength(position1.tag_id)-4,strlength(position1.tag_id));
+            tag2=extractBetween(position2.tag_id,strlength(position2.tag_id)-4,strlength(position2.tag_id));
+            if(count~=0)
+%                 disp(position1.superFrameNumber)
+%                 if (temp1==position1.superFrameNumber)
+%                     disp('Trouble reading from mqtt')
+%                     beep;
+%                     error = true;
+% 
+%                 else  
+%                     if(~(strcmp(position1.est_pos.x,"NaN")&&strcmp(position1.est_pos.y,"NaN")))
+%                         check = geofencing(position1.est_pos.x,position1.est_pos.y);
+%                         if(check)
+%                             disp(tag1+" OUTSIDE" + " " + position1.est_pos.x + " " + position1.est_pos.y)
+%                         else
+%                             disp(tag1+" INSIDE" + " " + position1.est_pos.x + " " + position1.est_pos.y)
+%                         end
+%                     end
+%                 end
+                
+                disp(position2.superFrameNumber)
+                if (temp2==position2.superFrameNumber)
+                    disp('Data received is not updated reconnecting')
+                    error = true;
+
+                else  
+                    if(~(strcmp(position2.est_pos.x,"NaN")&&strcmp(position2.est_pos.y,"NaN")))
+                        check = geofencing(position2.est_pos.x,position2.est_pos.y);
+                        if(check)
+                            disp(tag2+" OUTSIDE" + " " + position2.est_pos.x + " " + position2.est_pos.y)
+                        else
+                            disp(tag2+" INSIDE" + " " + position2.est_pos.x + " " + position2.est_pos.y)
+                        end
                     end
                 end
             end
-        end
-        count = count+1;
-        temp = position.superFrameNumber;
-        disp(position.superFrameNumber)
-        pause(0.1)
+            count = count+1;
+            %temp1 = position1.superFrameNumber;
+            temp2 = position2.superFrameNumber;
+            disp( " " + temp2);
+            pause(0.1)
+            if(error)
+                %delete(M1);
+                delete(M2);
+                throw(ME);
+            end
+            
+            pause(1);
+    end
+catch ME
+    disp(ME);
+    if contains(lower(ME.identifier), lower("MQTT"))
+            getData(ip1,ip2,link);
+    end
 end
 end
-
 
 
 function check = geofencing(X,Y)
@@ -41,8 +93,8 @@ end
 end
 
 
-function myCleanup(M)
+function myCleanup()
 disp('Close MQTT');
-delete(M);
+close all;
 end
 
