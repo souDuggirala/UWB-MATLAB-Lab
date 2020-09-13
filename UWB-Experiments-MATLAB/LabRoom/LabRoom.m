@@ -4,7 +4,7 @@ Y_TRUE = [1.8,1.8,4.7,6.6,6.6];
 
 %Anchor postion for TagElevated,AnchorsElevated,SquareTopology%
 x_anch_height=[0,0,7.43,7.43];
-y_anch_height=[0,7.77,7.43,0];
+y_anch_height=[0,7.77,7.77,0];
 
 GeoExp('LabRoom',x_anch_height,y_anch_height,X_TRUE,Y_TRUE);
 

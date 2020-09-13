@@ -52,10 +52,10 @@ function LabOutdoor()
 
             if(strcmpi(method,"Y"))
                 for i = 1:positions 
-                xPrompt = sprintf("\t Enter x coordinate of postion %d :", i);
-                x_anch_pos(i) = input(xPrompt);
-                yPrompt = sprintf("\t Enter y coordinate of postion %d :", i);
-                y_anch_pos(i) = input(yPrompt);     
+                xPrompt = sprintf("\t Enter x coordinate of tag postion %d :", i);
+                x_true(i) = input(xPrompt);
+                yPrompt = sprintf("\t Enter y coordinate of tag postion %d :", i);
+                y_true(i) = input(yPrompt);     
                 end 
 
             elseif(strcmpi(method,"N"))
