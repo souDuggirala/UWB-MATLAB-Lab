@@ -48,8 +48,8 @@ try
 %                 end
                 
                 disp(position2.superFrameNumber)
-                if (temp2==position2.superFrameNumber)
-                    disp('Data received is not updated reconnecting')
+              disp('Data received is not updated reconnecting')  if (temp2==position2.superFrameNumber)
+                    
                     error = true;
 
                 else  

@@ -91,7 +91,7 @@ function collectAndPlot()
                 link = 'dwm/node/';
                 link.append(tagId).append('/uplink/location');
                 mQTT = mqtt(tcp); 
-                mysub = subscribe(mQTT,'dwm/node/d605/uplink/location');
+                mysub = subscribe(mQTT,link);
                 WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,mysub,flag);
             end
         end
@@ -164,7 +164,7 @@ function WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,read
             'Reader Data Error!!!!','error'));
         flag=flag+1;
         disp(flag)
-        WritePosFile(i,positions,duration,waitTime,readerCheckTime,sP,flag)
+        WritePosFileUsingSerialPort(i,positions,duration,waitTime,readerCheckTime,sP,flag)
         else
             rethrow(ME)
         end
@@ -177,29 +177,33 @@ end
 
 
 
-function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,msub,flag)
+function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,mysub,flag)
     try  
         disp(initialpos + " " + positions);
+        pause(1);
         for i = linspace(initialpos,positions,(positions-initialpos)+1)          
-            fprintf("Checking the status of serial port\n");
-            initSerialIncomingBytes = msub.NumBytesAvailable;
+            fprintf("Checking the status of subscriber\n");
+            sampleData = jsondecode(read(mysub));
+            initFrameNumeber = sampleData.superFrameNumber;
             flushinput(msub);
             delayTimer(readerCheckTime);
-            if(initSerialIncomingBytes == msub.NumBytesAvailable)
-                ME = MException('Serialport:NoBytesAvailable', ...
-                'Listener Not in Reporting Mode');
-                beep;
-                throw(ME);
+            if(initFrameNumeber == msub.NumBytesAvailable)
+                ME = MException('myComponent:inputErrorMQTT', ...
+                    'Data received is not updated reconnecting');
+                    beep;
+                    throw(ME);
             else
-                fprintf("Status of serial port is healthy, data recording after wait time is over\n\n");
+                fprintf("Status of mqtt subcriber is healthy, data recording after wait time is over\n\n");
                 fileName="pos"+string(i)+".txt";
                 disp(fileName+' ' + 'collecting in progress');
                 fileID = fopen(fileName,'w');
                 delayTimer(waitTime);
                 tStart=tic;%starts the timer
-                flush(msub);
+                flushinput(msub);
                 while(true)
-                    data = readline(msub);
+                    postionData = jsondecode(read(mysub));
+                    tag = extractBetween(postionData.tag_id,strlength(postionData.tag_id)-4,strlength(postionData.tag_id));
+                    data = "POS,0," + tag +","+postionData.est_pos.x+","+position1.est_pos.y;
                     fprintf(fileID,data+"\n");
                     if(toc(tStart)>duration*60)
                         disp("Done with the file");
@@ -217,12 +221,12 @@ function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerChec
             end 
         end
     catch ME
-        if(strcmp(ME.identifier,'Serialport:NoBytesAvailable'))
-        uiwait(msgbox('Please check the location of listener with respect to tag',...
+        if(strcmp(ME.identifier,'myComponent:inputErrorMQTT'))
+        uiwait(msgbox('Please check the subcriber status manually',...
             'Reader Data Error!!!!','error'));
         flag=flag+1;
         disp(flag)
-        WritePosFile(i,positions,duration,waitTime,readerCheckTime,msub,flag)
+        WritePosFileUsingMQTT(i,positions,duration,waitTime,readerCheckTime,mysub,flag)
         else
             rethrow(ME)
         end
