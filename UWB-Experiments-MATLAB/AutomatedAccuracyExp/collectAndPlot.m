@@ -206,8 +206,8 @@ function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerChec
                     pause(0.1)
                     postionData = jsondecode(read(msub));
                     disp(postionData)
-                    tag = extractBetween(postionData.tag_id,strlength(postionData.tag_id)-4,strlength(postionData.tag_id));
-                    data = "POS,0," + tag +","+postionData.est_pos.x+","+postionData.est_pos.y;
+                    tag = extractBetween(postionData.tag_id,strlength(postionData.tag_id)-3,strlength(postionData.tag_id));
+                    data = "POS,0," + tag +","+postionData.est_pos.x+","+postionData.est_pos.y+","+postionData.est_pos.z+","+postionData.est_qual+","+"x0A";
                     fprintf(fileID,data+"\n");
                     if(toc(tStart)>duration*60)
                         disp("Done with the file");
