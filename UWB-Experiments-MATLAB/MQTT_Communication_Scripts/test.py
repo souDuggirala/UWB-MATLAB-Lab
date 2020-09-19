@@ -3,8 +3,6 @@ import serial
 import time
 t = serial.Serial("COM7",baudrate=115200,timeout=3)
 
-# dwm.dwm_pos_set((121,50,100),100,t)
-
 to_write=[b'\x01',b'\x0D',b'\x80',b'\x00',b'\x00',b'\x00',b'\x32',b'\x00',b'\x00',b'\x00',b'\xfb',b'\x00',b'\x00',b'\x00',b'\x64']
 print(len(to_write))
 # Initialize an empty byte object to concantenate

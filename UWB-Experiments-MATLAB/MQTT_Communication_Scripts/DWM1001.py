@@ -87,8 +87,9 @@ def dwm_pos_set(position,qf,t):        # display in hexadecimal format
 
     TYPE=b'\x01'
     LENGTH=b'\x0D'
-    t.write(TYPE)
-    t.write(LENGTH)
+    # t.write(TYPE)
+    # t.write(LENGTH)
+    t.write(TYPE + LENGTH)
     
     SHOW_OPE_INFO(t.portstr,TYPE,LENGTH)
     print(len(decimalTobytes(position,qf)))
@@ -115,7 +116,9 @@ def dwm_pos_get(t):        # display in hexadecimal format and decimal format
 
     TYPE=b'\x02'
     LENGTH=b'\x00'
-    t.write(TYPE+LENGTH)
+    # t.write(TYPE)
+    # t.write(LENGTH)
+    t.write(TYPE + LENGTH)
 
     SHOW_OPE_INFO(t.portstr,TYPE,LENGTH)
 
@@ -142,8 +145,9 @@ def dwm_upd_rate_get(t):
 
     TYPE=b'\x04'
     LENGTH=b'\x00'
-    t.write(TYPE)
-    t.write(LENGTH)
+    # t.write(TYPE)
+    # t.write(LENGTH)
+    t.write(TYPE + LENGTH)
 
     SHOW_OPE_INFO(t.portstr,TYPE,LENGTH)
 
@@ -161,8 +165,9 @@ def dwm_cfg_tag_set(tag,t):
 
     TYPE=b'\x07'
     LENGTH=b'\x02'
-    t.write(TYPE)
-    t.write(LENGTH)
+    # t.write(TYPE)
+    # t.write(LENGTH)
+    t.write(TYPE + LENGTH)
 
     SHOW_OPE_INFO(t.portstr,TYPE,LENGTH)
     ######################################
@@ -186,8 +191,9 @@ def dwm_cfg_anchor_set(t):
 
     TYPE=b'\x07'
     LENGTH=b'\x02'
-    t.write(TYPE)
-    t.write(LENGTH)
+    # t.write(TYPE)
+    # t.write(LENGTH)
+    t.write(TYPE + LENGTH)
     #######################################
     t.write(b"\xCE\x00")#### NEED MODIFY (SET)
     #######################################
@@ -279,7 +285,6 @@ def dwm_panid_get():
     return -1 
 
 def dwm_nodeid_get(t):
-    print("getting node id......")
     t.write(b'\x30\x00')
     time.sleep(1)
     num=t.inWaiting()
