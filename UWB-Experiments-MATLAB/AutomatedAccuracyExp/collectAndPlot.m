@@ -76,7 +76,7 @@ function collectAndPlot()
             initialpos=1;
             flag=0;
             modeOfDataCollection = input("What is mode of data collection?(SerialPort/MQTT) :",'s');
-            if(~strcmpi(modeOfDataCollection,"SerialPort"))
+            if(strcmpi(modeOfDataCollection,"SerialPort"))
                 serialPort = input("Enter the serial port name (string): ",'s');
                 s=serialport(serialPort,115200,"Timeout",30);
                 mkdir (expName)
@@ -84,12 +84,15 @@ function collectAndPlot()
                 WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
             else
                 ipaddress = input("Enter the IP address for MQTT publisher tag(XXX.XX.XX.XX) :",'s');
-                tagId = inpur("Enter the tag ID :",'s');
-                tagId = tagId.lower;
-                tcp = 'tcp://';
-                tcp.append(ipaddress);
-                link = 'dwm/node/';
-                link.append(tagId).append('/uplink/location');
+                ipaddress = string(ipaddress);
+                tagId = input("Enter the tag ID :",'s');
+                tagId = string(tagId);
+                tagId = tagId.upper();
+                tcp = "tcp://";
+                tcp = tcp.append(ipaddress);
+                link = "Tag";
+                link = link.append(tagId);
+                link = link.append("/Uplink/Location");
                 mQTT = mqtt(tcp); 
                 mysub = subscribe(mQTT,link);
                 WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,mysub,flag);
@@ -177,13 +180,13 @@ end
 
 
 
-function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,mysub,flag)
+function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,msub,flag)
     try  
         disp(initialpos + " " + positions);
         pause(1);
         for i = linspace(initialpos,positions,(positions-initialpos)+1)          
             fprintf("Checking the status of subscriber\n");
-            sampleData = jsondecode(read(mysub));
+            sampleData = jsondecode(read(msub));
             initFrameNumeber = sampleData.superFrameNumber;
             flushinput(msub);
             delayTimer(readerCheckTime);
@@ -226,12 +229,10 @@ function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerChec
             'Reader Data Error!!!!','error'));
         flag=flag+1;
         disp(flag)
-        WritePosFileUsingMQTT(i,positions,duration,waitTime,readerCheckTime,mysub,flag)
+        WritePosFileUsingMQTT(i,positions,duration,waitTime,readerCheckTime,msub,flag)
         else
             rethrow(ME)
-        end
-        
-        
+        end   
     end
     fclose("all");
 end
