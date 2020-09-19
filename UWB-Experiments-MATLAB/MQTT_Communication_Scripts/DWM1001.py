@@ -115,8 +115,7 @@ def dwm_pos_get(t):        # display in hexadecimal format and decimal format
 
     TYPE=b'\x02'
     LENGTH=b'\x00'
-    t.write(TYPE)
-    t.write(LENGTH)
+    t.write(TYPE+LENGTH)
 
     SHOW_OPE_INFO(t.portstr,TYPE,LENGTH)
 
@@ -280,16 +279,8 @@ def dwm_panid_get():
     return -1 
 
 def dwm_nodeid_get(t):
-    
-    
-    print(t.portstr)
-    t.write(b'\x30')
-    t.write(b'\x00')
-
-    print("using ")
-    print("written to serial: ", b'\x30',type(b'\x30'))
-    print("written to serial: ", b'\x00',type(b'\x00'))
-
+    print("getting node id......")
+    t.write(b'\x30\x00')
     time.sleep(1)
     num=t.inWaiting()
     print("num",num)
