@@ -76,11 +76,11 @@ function collectAndPlot()
             initialpos=1;
             flag=0;
             modeOfDataCollection = input("What is mode of data collection?(SerialPort/MQTT) :",'s');
+            mkdir (expName)
+            cd (expName)
             if(strcmpi(modeOfDataCollection,"SerialPort"))
                 serialPort = input("Enter the serial port name (string): ",'s');
                 s=serialport(serialPort,115200,"Timeout",30);
-                mkdir (expName)
-                cd (expName)
                 WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
             else
                 ipaddress = input("Enter the IP address for MQTT publisher tag(XXX.XX.XX.XX) :",'s');
@@ -90,7 +90,7 @@ function collectAndPlot()
                 tagId = tagId.upper();
                 tcp = "tcp://";
                 tcp = tcp.append(ipaddress);
-                link = "Tag";
+                link = "Tag/";
                 link = link.append(tagId);
                 link = link.append("/Uplink/Location");
                 mQTT = mqtt(tcp); 
@@ -106,7 +106,8 @@ function collectAndPlot()
              GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
         else
             disp("Moving files to LaoOutdoor directory for future ploting")
-            movefile(expName,'../LabOutdoor');
+            cd ..
+            movefile(expName,'../LabOutdoor/');
         end
         
        
@@ -188,9 +189,8 @@ function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerChec
             fprintf("Checking the status of subscriber\n");
             sampleData = jsondecode(read(msub));
             initFrameNumeber = sampleData.superFrameNumber;
-            flushinput(msub);
             delayTimer(readerCheckTime);
-            if(initFrameNumeber == msub.NumBytesAvailable)
+            if(initFrameNumeber == jsondecode(read(msub)).superFrameNumber)
                 ME = MException('myComponent:inputErrorMQTT', ...
                     'Data received is not updated reconnecting');
                     beep;
@@ -202,11 +202,12 @@ function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerChec
                 fileID = fopen(fileName,'w');
                 delayTimer(waitTime);
                 tStart=tic;%starts the timer
-                flushinput(msub);
                 while(true)
-                    postionData = jsondecode(read(mysub));
+                    pause(0.1)
+                    postionData = jsondecode(read(msub));
+                    disp(postionData)
                     tag = extractBetween(postionData.tag_id,strlength(postionData.tag_id)-4,strlength(postionData.tag_id));
-                    data = "POS,0," + tag +","+postionData.est_pos.x+","+position1.est_pos.y;
+                    data = "POS,0," + tag +","+postionData.est_pos.x+","+postionData.est_pos.y;
                     fprintf(fileID,data+"\n");
                     if(toc(tStart)>duration*60)
                         disp("Done with the file");
