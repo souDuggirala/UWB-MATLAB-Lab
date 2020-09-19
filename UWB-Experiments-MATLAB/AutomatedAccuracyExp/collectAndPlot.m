@@ -202,24 +202,28 @@ function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerChec
                 fileID = fopen(fileName,'w');
                 delayTimer(waitTime);
                 tStart=tic;%starts the timer
+                temp = 0;
                 while(true)
-                    pause(0.1)
+                    pause(0.001)
                     postionData = jsondecode(read(msub));
-                    disp(postionData)
-                    tag = extractBetween(postionData.tag_id,strlength(postionData.tag_id)-3,strlength(postionData.tag_id));
-                    data = "POS,0," + tag +","+postionData.est_pos.x+","+postionData.est_pos.y+","+postionData.est_pos.z+","+postionData.est_qual+","+"x0A";
-                    fprintf(fileID,data+"\n");
-                    if(toc(tStart)>duration*60)
-                        disp("Done with the file");
-                        while(i~=positions)
-                            confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
-                            if(confirmation=="Y"||confirmation=="y")
-                                break;
-                            else
-                                continue;
-                            end   
+                    disp(postionData);
+                    if(~(temp == postionData.superFrameNumber))
+                        temp = postionData.superFrameNumber;
+                        tag = extractBetween(postionData.tag_id,strlength(postionData.tag_id)-3,strlength(postionData.tag_id));
+                    data = "POS,0," + tag +","+postionData.est_pos.x+","+postionData.est_pos.y+","+postionData.est_pos.z+","+postionData.est_qual+","+"x0A"+","+postionData.superFrameNumber;
+                        fprintf(fileID,data+"\n");
+                        if(toc(tStart)>duration*60)
+                            disp("Done with the file");
+                            while(i~=positions)
+                                confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
+                                if(confirmation=="Y"||confirmation=="y")
+                                    break;
+                                else
+                                    continue;
+                                end   
+                            end
+                            break;
                         end
-                        break;
                     end
                 end
             end 
