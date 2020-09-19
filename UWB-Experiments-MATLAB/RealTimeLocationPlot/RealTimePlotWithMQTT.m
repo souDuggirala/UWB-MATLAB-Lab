@@ -27,7 +27,7 @@ function getData(ip1,ip2,link,update_interval)
             %position1 = jsondecode(msg1);
             position2 = jsondecode(msg2);
             %tag1=extractBetween(position1.tag_id,strlength(position1.tag_id)-4,strlength(position1.tag_id));
-            tag2=extractBetween(position2.tag_id,strlength(position2.tag_id)-4,strlength(position2.tag_id));
+            tag2=extractBetween(position2.tag_id,strlength(position2.tag_id)-3,strlength(position2.tag_id));
             if(count~=0)
                 disp(position2.superFrameNumber);
                 if (temp2==position2.superFrameNumber)
