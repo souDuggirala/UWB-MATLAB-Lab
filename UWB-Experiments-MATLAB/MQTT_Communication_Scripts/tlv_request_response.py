@@ -18,7 +18,7 @@ def hexShow(argv):        # display in hexadecimal format
         result += hhex+' '  
     print('hexShow:',result)
 
-t = serial.Serial("COM3", baudrate=115200, timeout=3.0)
+t = serial.Serial("COM6", baudrate=115200, timeout=3.0)
 print(t.portstr)
 tag = t.write(b'\x30')
 length = t.write(b'\x00')
