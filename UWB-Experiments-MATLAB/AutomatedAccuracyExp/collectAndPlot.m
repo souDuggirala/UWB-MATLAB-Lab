@@ -25,7 +25,7 @@ function collectAndPlot()
             
         elseif(strcmpi(existingValues,"N"))
             
-             uiwait(msgbox('Please confirm if you have completed position congiguration for anchorrs',...
+             uiwait(msgbox('Please confirm if you have completed position configuration for anchors',...
             'Anchor Setup Confirmation!!!!','warn'));
         
             %Getting number of the positions
@@ -75,7 +75,7 @@ function collectAndPlot()
         if(~strcmpi(existingValues,"Y"))
             initialpos=1;
             flag=0;
-            modeOfDataCollection = input("What is mode of data collection?(SerialPort/MQTT) :",'s');
+            modeOfDataCollection = input("What is the mode of data collection? (SerialPort/MQTT): ",'s');
             mkdir (expName)
             cd (expName)
             if(strcmpi(modeOfDataCollection,"SerialPort"))
@@ -83,7 +83,7 @@ function collectAndPlot()
                 s=serialport(serialPort,115200,"Timeout",30);
                 WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
             else
-                ipaddress = input("Enter the IP address for MQTT publisher tag(XXX.XX.XX.XX) :",'s');
+                ipaddress = input("Enter the IP address for MQTT publisher tag (XXX.XX.XX.XX): ",'s');
                 ipaddress = string(ipaddress);
                 tagId = input("Enter the tag ID :",'s');
                 tagId = string(tagId);
@@ -105,7 +105,7 @@ function collectAndPlot()
         if(strcmpi(skipOrNot,"Y"))
              GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
         else
-            disp("Moving files to LaoOutdoor directory for future ploting")
+            disp("Moving files to LaoOutdoor directory for future plotting")
             cd ..
             movefile(expName,'../LabOutdoor/');
         end
@@ -150,7 +150,7 @@ function WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,read
                     if(toc(tStart)>duration*60)
                         disp("Done with the file");
                         while(i~=positions)
-                            confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
+                            confirmation = input("Please confirm location tag has changed? (Y/N) ", 's');    
                             if(confirmation=="Y"||confirmation=="y")
                                 break;
                             else
@@ -205,17 +205,17 @@ function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerChec
                 temp = 0;
                 while(true)
                     pause(0.001)
-                    postionData = jsondecode(read(msub));
-                    disp(postionData);
-                    if(~(temp == postionData.superFrameNumber))
-                        temp = postionData.superFrameNumber;
-                        tag = extractBetween(postionData.tag_id,strlength(postionData.tag_id)-3,strlength(postionData.tag_id));
-                    data = "POS,0," + tag +","+postionData.est_pos.x+","+postionData.est_pos.y+","+postionData.est_pos.z+","+postionData.est_qual+","+"x0A"+","+postionData.superFrameNumber;
+                    positionData = jsondecode(read(msub));
+                    disp(positionData);
+                    if(~(temp == positionData.superFrameNumber))
+                        temp = positionData.superFrameNumber;
+                        tag = extractBetween(positionData.tag_id,strlength(positionData.tag_id)-3,strlength(positionData.tag_id));
+                    data = "POS,0," + tag +","+positionData.est_pos.x+","+positionData.est_pos.y+","+positionData.est_pos.z+","+positionData.est_qual+","+"x0A"+","+positionData.superFrameNumber;
                         fprintf(fileID,data+"\n");
                         if(toc(tStart)>duration*60)
                             disp("Done with the file");
                             while(i~=positions)
-                                confirmation = input("Please confirm location tag is changed? (Y/N) ", 's');    
+                                confirmation = input("Please confirm location tag has changed? (Y/N) ", 's');    
                                 if(confirmation=="Y"||confirmation=="y")
                                     break;
                                 else
