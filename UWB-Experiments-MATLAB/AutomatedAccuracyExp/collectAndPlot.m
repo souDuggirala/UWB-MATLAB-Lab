@@ -82,9 +82,14 @@ function collectAndPlot()
                 serialPort = input("Enter the serial port name (string): ",'s');
                 s=serialport(serialPort,115200,"Timeout",30);
                 WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
-            else
-                ipaddress = input("Enter the IP address for MQTT publisher tag (XXX.XX.XX.XX): ",'s');
-                ipaddress = string(ipaddress);
+            elseif(strcmpi(modeOfDataCollection,"MQTT"))
+                fprintf("[Wi-Fi Backbone] Scanning the IP for tags in WLAN...\n");
+                [hostIp, subnetMask] = fetchHostIp();
+                fprintf("[Wi-Fi Backbone] Host ip: " + hostIp, "; Subnet Mask: " + subnetMask + "\n");
+                [tagIp, tagMAC] = ipScan(hostIp, subnetMask);
+                fprintf("[Wi-Fi Backbone] Using the first found tag as the experiment object..." + "\n")
+                fprintf("[Wi-Fi Backbone] First tag ip found as: " + tagIp{1} + " MAC: " + tagMAC{1} + "\n");
+                ipaddress = string(tagIp{1});
                 tagId = input("Enter the tag ID :",'s');
                 tagId = string(tagId);
                 tagId = tagId.upper();
@@ -105,9 +110,9 @@ function collectAndPlot()
         if(strcmpi(skipOrNot,"Y"))
              GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
         else
-            disp("Moving files to LaoOutdoor directory for future plotting")
             cd ..
             movefile(expName,'../LabOutdoor/');
+            disp("Moved files to LabOutdoor directory for future plotting \n")
         end
         
        
@@ -458,6 +463,45 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     
 end
 
+% function calculates the ground-truth tag coordinates 
+% according to surveyed results in experiments (solving equation set)
+% Options: two-point surveying & three-point surveying
+function [hostIp, subnetMask] = fetchHostIp()
+    hostIp = strings;
+    subnetMask = strings;
+    if(ispc)
+        [status, ipOut] = system('ipconfig');
+        ipOutLines = splitlines(ipOut);
+        for i=1:1:length(ipOutLines)
+           if(contains(ipOutLines{i}, 'Wireless LAN adapter Wi-Fi:'))
+               startIdx = i + 1;
+               k = startIdx;
+               while(true)
+                   k = k + 1;
+                   if(~isempty(ipOutLines{k}))
+                       continue
+                   else
+                       endIdx = k;
+                       break
+                   end
+               end
+               for j=startIdx:1:endIdx
+                   if(contains(ipOutLines{j}, 'IPv4 Address'))
+                       hostIp = regexp(ipOutLines{j},'\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
+                   end
+                   if(contains(ipOutLines{j}, 'Subnet Mask'))
+                       subnetMask = regexp(ipOutLines{j},'\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
+                   end
+               end
+               break
+           end
+        end
+        
+    elseif(isunix || ismac)
+        [status, ipOut] = system('ifconfig');
+        ipOutLines = splitlines(ipOut);
+    end
+end
 
 % function calculates the ground-truth tag coordinates 
 % according to surveyed results in experiments (solving equation set)
@@ -526,17 +570,17 @@ end
 
 
 function myCleanup()
-global expName status
-fprintf('\n Close ALL \n');
-fclose("all");
-fprintf(expName + "\n");
-fprintf(status + "\n");
-disp(pwd)
-cd(expName);
-if ~strcmp(status,"FT")
-    delete("*.mat")
-    delete("*.png")
-end
-cd ..
-clear;
+    global expName status
+    fprintf('\n Close ALL \n');
+    fclose("all");
+    fprintf(expName + "\n");
+    fprintf(status + "\n");
+    disp(pwd)
+    cd(expName);
+    if ~strcmp(status,"FT")
+        delete("*.mat")
+        delete("*.png")
+    end
+    cd ..
+    clear;
 end
