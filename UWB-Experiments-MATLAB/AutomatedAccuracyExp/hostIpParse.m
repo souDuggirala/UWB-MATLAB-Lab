@@ -33,8 +33,7 @@ function [hostIp, subnetMask] = hostIpParse()
         ipOutLines = splitlines(ipOut);
         for i=1:1:length(ipOutLines)
            if(contains(ipOutLines{i}, 'en0'))
-               startIdx = i + 1;
-               k = startIdx;
+               k = i + 1;
                while(k<=length(ipOutLines))
                    k = k + 1;
                    if(contains(ipOutLines{k}, 'inet') && ~contains(ipOutLines{k}, 'inet6'))
@@ -47,8 +46,8 @@ function [hostIp, subnetMask] = hostIpParse()
                        field_4 = num2str(hex2dec(subnetMaskRaw{1}(7:8)));
                        subnetMask = strcat({field_1},{'.'},{field_2},{'.'},...
                            {field_3},{'.'},{field_4});
-                   end
                    break
+                   end
                end
                break
            end
