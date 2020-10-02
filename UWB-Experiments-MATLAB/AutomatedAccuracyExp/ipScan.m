@@ -11,7 +11,11 @@ function [tagIp, tagMAC] = ipScan(hostIp, subnetMask)
         [status, nmapOut] = system(char(strcat('nmap -sP',{' '},subnetSegment,...
             {' '},{'--exclude'},{' '},hostIp)));
     elseif(isunix || ismac)
+        % set proper env to execute nmap
+        setenv('PATH', [getenv('PATH') ':/usr/local/bin:/usr/bin:/bin']);
         % MAC address won't show without sudo
+        disp(char(strcat('sudo nmap -sP',{' '},subnetSegment,...
+            {' '},{'--exclude'},{' '},hostIp)))
         [status, nmapOut] = system(char(strcat('sudo nmap -sP',{' '},subnetSegment,...
             {' '},{'--exclude'},{' '},hostIp)));
     end

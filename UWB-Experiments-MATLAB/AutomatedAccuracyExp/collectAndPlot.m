@@ -76,18 +76,18 @@ function collectAndPlot()
             initialpos=1;
             flag=0;
             modeOfDataCollection = input("What is the mode of data collection? (SerialPort/MQTT): ",'s');
-            mkdir (expName)
-            cd (expName)
+            mkdir (expName);
             if(strcmpi(modeOfDataCollection,"SerialPort"))
                 serialPort = input("Enter the serial port name (string): ",'s');
                 s=serialport(serialPort,115200,"Timeout",30);
+                cd (expName);
                 WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
             elseif(strcmpi(modeOfDataCollection,"MQTT"))
                 fprintf("[Wi-Fi Backbone] Scanning the IP for tags in WLAN...\n");
                 [hostIp, subnetMask] = fetchHostIp();
-                fprintf("[Wi-Fi Backbone] Host ip: " + hostIp, "; Subnet Mask: " + subnetMask + "\n");
+                fprintf("[Wi-Fi Backbone] Host ip: " + hostIp + "; Subnet Mask: " + subnetMask + "\n");
                 [tagIp, tagMAC] = ipScan(hostIp, subnetMask);
-                fprintf("[Wi-Fi Backbone] Using the first found tag as the experiment object..." + "\n")
+                fprintf("[Wi-Fi Backbone] Using the first found tag as the experiment object..." + "\n");
                 fprintf("[Wi-Fi Backbone] First tag ip found as: " + tagIp{1} + " MAC: " + tagMAC{1} + "\n");
                 ipaddress = string(tagIp{1});
                 tagId = input("Enter the tag ID :",'s');
@@ -100,6 +100,7 @@ function collectAndPlot()
                 link = link.append("/Uplink/Location");
                 mQTT = mqtt(tcp); 
                 mysub = subscribe(mQTT,link);
+                cd (expName);
                 WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,mysub,flag);
             end
         end
@@ -476,7 +477,7 @@ function [hostIp, subnetMask] = fetchHostIp()
            if(contains(ipOutLines{i}, 'Wireless LAN adapter Wi-Fi:'))
                startIdx = i + 1;
                k = startIdx;
-               while(true)
+               while(k<=length(ipOutLines))
                    k = k + 1;
                    if(~isempty(ipOutLines{k}))
                        continue
@@ -497,9 +498,33 @@ function [hostIp, subnetMask] = fetchHostIp()
            end
         end
         
-    elseif(isunix || ismac)
+    elseif(ismac)
         [status, ipOut] = system('ifconfig');
         ipOutLines = splitlines(ipOut);
+        for i=1:1:length(ipOutLines)
+           if(contains(ipOutLines{i}, 'en0'))
+               startIdx = i + 1;
+               k = startIdx;
+               while(k<=length(ipOutLines))
+                   k = k + 1;
+                   if(~(contains(ipOutLines{k}, 'inet') & ~contains(ipOutLines{k}, 'inet6')))
+                       continue
+                   else
+                       hostIpRaw = regexp(ipOutLines{k},'inet \d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
+                       hostIp = regexp(hostIpRaw{1},'\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
+                       subnetMaskRaw = regexp(ipOutLines{k},'([0-9A-Fa-f]{8})','match');
+                       field_1 = num2str(hex2dec(subnetMaskRaw{1}(1:2)));
+                       field_2 = num2str(hex2dec(subnetMaskRaw{1}(3:4)));
+                       field_3 = num2str(hex2dec(subnetMaskRaw{1}(5:6)));
+                       field_4 = num2str(hex2dec(subnetMaskRaw{1}(7:8)));
+                       subnetMask = strcat({field_1},{'.'},{field_2},{'.'},...
+                           {field_3},{'.'},{field_4});
+                   end
+                   break
+               end
+               break
+           end
+        end
     end
 end
 
