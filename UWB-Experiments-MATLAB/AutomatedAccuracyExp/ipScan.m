@@ -1,32 +1,33 @@
+% Scan the ip address of tags in the same WLAN network
+% Dependency: nmap available at https://nmap.org/download.html
 function [tagIp, tagMAC] = ipScan(hostIp, subnetMask)
-    % Scan the ip address of tags in the same WLAN network
-    % Dependency: nmap available at https://nmap.org/download.html
     cleanup = onCleanup(@()myCleanup());
     tagIp = {};
     tagMAC = {};
     
-    subnetSegment = extractNetSeg(hostIp, subnetMask);
+    subnetSegment = netSegParse(hostIp, subnetMask);
     if(ispc)
         % Nmap is installed with administrator privilege
-        [status, nmapOut] = system(char(strcat('nmap -sP',{' '},subnetSegment,...
+        [stat, nmapOut] = system(char(strcat('nmap -sP',{' '},subnetSegment,...
             {' '},{'--exclude'},{' '},hostIp)));
-    elseif(isunix || ismac)
+    elseif(ismac)
         % set proper env to execute nmap
         setenv('PATH', [getenv('PATH') ':/usr/local/bin:/usr/bin:/bin']);
         % MAC address won't show without sudo
         disp(char(strcat('sudo nmap -sP',{' '},subnetSegment,...
             {' '},{'--exclude'},{' '},hostIp)))
-        [status, nmapOut] = system(char(strcat('sudo nmap -sP',{' '},subnetSegment,...
+        [stat, nmapOut] = system(char(strcat('sudo nmap -sP',{' '},subnetSegment,...
             {' '},{'--exclude'},{' '},hostIp)));
+    elseif(isunix)
+        error('MATLAB runtime scanner on unix is not developped yet!')
     end
+    
     nmapOutLines = splitlines(nmapOut);
     trimmedNmapOut = nmapOutLines(2:end-2);
     try
         for i = 3:1:length(trimmedNmapOut)
             detectedIdxCell = regexp(trimmedNmapOut(i), 'Raspberry Pi');
-            if(isempty(detectedIdxCell{1}))
-                continue
-            else
+            if(~isempty(detectedIdxCell{1}))
                 detectedIp = regexp(trimmedNmapOut(i-2),'\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
                 detectedMac = regexp(trimmedNmapOut(i),'([0-9A-F]{2}:){5}[0-9A-F]{2}','match');
                 tagIp(length(tagIp)+1) = detectedIp;
@@ -40,7 +41,7 @@ function [tagIp, tagMAC] = ipScan(hostIp, subnetMask)
     end
 end
 
-function netSegment = extractNetSeg(ip, subnetMask)
+function netSegment = netSegParse(ip, subnetMask)
     % Extract the net IP segment as ***.***.***.***/**
     ipStr = split(ip, '.');
     maskStr = split(subnetMask, '.');
@@ -49,6 +50,7 @@ function netSegment = extractNetSeg(ip, subnetMask)
     ipSegmentDec = reshape(bitand(ipDec, maskDec),[size(ipDec,2),size(ipDec,1)]);
     ipSegmentStr = strjoin(arrayfun(@num2str, ipSegmentDec, 'UniformOutput',false),'.');
     slashLength = length(strfind(reshape(dec2bin(maskDec),[1,32]),'1'));
+    % Converting IP + mask format to IP/24 format as input to nmap
     netSegment = strcat(ipSegmentStr, {'/'},num2str(slashLength));
 end
 

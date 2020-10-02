@@ -84,7 +84,7 @@ function collectAndPlot()
                 WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
             elseif(strcmpi(modeOfDataCollection,"MQTT"))
                 fprintf("[Wi-Fi Backbone] Scanning the IP for tags in WLAN...\n");
-                [hostIp, subnetMask] = fetchHostIp();
+                [hostIp, subnetMask] = hostIpParse();
                 fprintf("[Wi-Fi Backbone] Host ip: " + hostIp + "; Subnet Mask: " + subnetMask + "\n");
                 [tagIp, tagMAC] = ipScan(hostIp, subnetMask);
                 fprintf("[Wi-Fi Backbone] Using the first found tag as the experiment object..." + "\n");
@@ -462,70 +462,6 @@ function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
     xlabel('X coordinate (m)');
     ylabel('Y coordinate (m)');
     
-end
-
-% function calculates the ground-truth tag coordinates 
-% according to surveyed results in experiments (solving equation set)
-% Options: two-point surveying & three-point surveying
-function [hostIp, subnetMask] = fetchHostIp()
-    hostIp = strings;
-    subnetMask = strings;
-    if(ispc)
-        [status, ipOut] = system('ipconfig');
-        ipOutLines = splitlines(ipOut);
-        for i=1:1:length(ipOutLines)
-           if(contains(ipOutLines{i}, 'Wireless LAN adapter Wi-Fi:'))
-               startIdx = i + 1;
-               k = startIdx;
-               while(k<=length(ipOutLines))
-                   k = k + 1;
-                   if(~isempty(ipOutLines{k}))
-                       continue
-                   else
-                       endIdx = k;
-                       break
-                   end
-               end
-               for j=startIdx:1:endIdx
-                   if(contains(ipOutLines{j}, 'IPv4 Address'))
-                       hostIp = regexp(ipOutLines{j},'\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
-                   end
-                   if(contains(ipOutLines{j}, 'Subnet Mask'))
-                       subnetMask = regexp(ipOutLines{j},'\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
-                   end
-               end
-               break
-           end
-        end
-        
-    elseif(ismac)
-        [status, ipOut] = system('ifconfig');
-        ipOutLines = splitlines(ipOut);
-        for i=1:1:length(ipOutLines)
-           if(contains(ipOutLines{i}, 'en0'))
-               startIdx = i + 1;
-               k = startIdx;
-               while(k<=length(ipOutLines))
-                   k = k + 1;
-                   if(~(contains(ipOutLines{k}, 'inet') & ~contains(ipOutLines{k}, 'inet6')))
-                       continue
-                   else
-                       hostIpRaw = regexp(ipOutLines{k},'inet \d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
-                       hostIp = regexp(hostIpRaw{1},'\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}','match');
-                       subnetMaskRaw = regexp(ipOutLines{k},'([0-9A-Fa-f]{8})','match');
-                       field_1 = num2str(hex2dec(subnetMaskRaw{1}(1:2)));
-                       field_2 = num2str(hex2dec(subnetMaskRaw{1}(3:4)));
-                       field_3 = num2str(hex2dec(subnetMaskRaw{1}(5:6)));
-                       field_4 = num2str(hex2dec(subnetMaskRaw{1}(7:8)));
-                       subnetMask = strcat({field_1},{'.'},{field_2},{'.'},...
-                           {field_3},{'.'},{field_4});
-                   end
-                   break
-               end
-               break
-           end
-        end
-    end
 end
 
 % function calculates the ground-truth tag coordinates 
