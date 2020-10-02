@@ -1,7 +1,6 @@
 % Scan the ip address of tags in the same WLAN network
 % Dependency: nmap available at https://nmap.org/download.html
 function [tagIp, tagMAC] = ipScan(hostIp, subnetMask)
-    cleanup = onCleanup(@()myCleanup());
     tagIp = {};
     tagMAC = {};
     
@@ -14,10 +13,11 @@ function [tagIp, tagMAC] = ipScan(hostIp, subnetMask)
         % set proper env to execute nmap
         setenv('PATH', [getenv('PATH') ':/usr/local/bin:/usr/bin:/bin']);
         % MAC address won't show without sudo
-        disp(char(strcat('sudo nmap -sP',{' '},subnetSegment,...
-            {' '},{'--exclude'},{' '},hostIp)))
+        % Password needed for authentication
+        fprintf("[Wi-Fi Backbone] If suspends, enter sudo password and press enter: \n")
         [stat, nmapOut] = system(char(strcat('sudo nmap -sP',{' '},subnetSegment,...
             {' '},{'--exclude'},{' '},hostIp)));
+        
     elseif(isunix)
         error('MATLAB runtime scanner on unix is not developped yet!')
     end
@@ -52,11 +52,4 @@ function netSegment = netSegParse(ip, subnetMask)
     slashLength = length(strfind(reshape(dec2bin(maskDec),[1,32]),'1'));
     % Converting IP + mask format to IP/24 format as input to nmap
     netSegment = strcat(ipSegmentStr, {'/'},num2str(slashLength));
-end
-
-function myCleanup()
-    fprintf('\n Close ALL \n');
-    fclose("all");
-    disp(pwd)
-    clear;
 end
