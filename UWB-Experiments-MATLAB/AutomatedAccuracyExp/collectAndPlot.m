@@ -1,13 +1,6 @@
 function collectAndPlot()
     global status expName;
-    status = "ST";
-    
-    %Intializing Ground truth var
-    x_true = zeros(1,1);
-    y_true = zeros(1,1);
-    %Intializing Anchor Position var
-    x_anch_pos = zeros(1,1);
-    y_anch_pos = zeros(1,1);
+    status = "ST";  
     cleanup = onCleanup(@()myCleanup());
     try
         %Getting name of the experiment
@@ -24,41 +17,16 @@ function collectAndPlot()
             load(expName+"/LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
             
         elseif(strcmpi(existingValues,"N"))
+            %Getting experiment configuration
+            [positions, duration, waitTime, readerCheckTime] = expConfigSetup();
             
-             uiwait(msgbox('Please confirm if you have completed position configuration for anchors',...
-            'Anchor Setup Confirmation!!!!','warn'));
-        
-            %Getting number of the positions
-            positions = input("Enter the number of positions: ");
+            %Getting anchor information
+            [x_anch_pos, y_anch_pos] = expAnchorGet();
             
-            %Getting time duration of positioning data collection, in minutes
-            duration = input("Enter the time duration in minutes for each position (in mins): ");
-            
-            %Getting time in seconds after which recording starts
-            waitTime = input("Enter the time duration to wait before recording starts (in secs): ");
-            
-            
-            %Getting time to verify reader operation 
-            readerCheckTime = input("Enter the listener testing time (in secs): ");
-            
-
-            %Getting number of anchors
-            anchNumber = input("Enter the number of UWB anchors: ");
-
             %Ground truth
             x_true = zeros(1,positions);
             y_true = zeros(1,positions);
 
-            %Anchor Position
-            x_anch_pos = zeros(1,anchNumber);
-            y_anch_pos = zeros(1,anchNumber);
-            
-            for i = 1:anchNumber
-                xPrompt = sprintf("\t Enter x coordinate of anchor %d :", i);
-                x_anch_pos(i) = input(xPrompt);
-                yPrompt = sprintf("\t Enter y coordinate of anchor %d :", i);
-                y_anch_pos(i) = input(yPrompt);        
-            end
         end 
 
         posAnchor = zeros(1,2*length(x_anch_pos));
@@ -116,10 +84,7 @@ function collectAndPlot()
             disp("Moved files to LabOutdoor directory for future plotting \n")
         end
         
-       
-    
    catch ME
-       
        fprintf("\n"+ME.identifier);
        beep;
        rethrow(ME);
@@ -501,6 +466,81 @@ function coordinates = triangulationForCordinates(aNum,ds,xAP,yAP)
     end
 
 
+end
+
+function [positions, duration, waitTime, readerCheckTime] = expConfigSetup()
+    %Getting number of the positions
+    promptPositionGet = "Enter the number of positions: ";
+    positions = uint32(sscanf(input(promptPositionGet, 's'), '%d'));
+    while(isempty(positions) || ~isa(positions,'integer') || (positions < 1))
+        positions = uint32(sscanf(input("Input Invalid. " + promptPositionGet, 's'), '%d'));
+    end
+
+    %Getting time duration of positioning data collection, in minutes
+    promptDurationGet = "Enter the time duration in minutes for each position (in mins): ";
+    duration = double(sscanf(input(promptDurationGet,'s'),'%f'));
+    while(isempty(duration) || ~isa(duration,'numeric') || (duration < 0))
+        duration = double(sscanf(input("Input Invalid. " + promptDurationGet,'s'),'%f'));
+    end
+
+    %Getting time in seconds after which recording starts
+    promptWaitTimeGet = "Enter the time duration to wait before recording starts (in secs): ";
+    waitTime = double(sscanf(input(promptWaitTimeGet,'s'),'%f'));
+    while(isempty(waitTime) || ~isa(waitTime,'numeric') || (waitTime < 0))
+        waitTime = double(sscanf(input("Input Invalid. " + promptWaitTimeGet,'s'),'%f'));
+    end
+
+    %Getting time to verify reader operation 
+    promptReaderCheckTimeGet = "Enter the listener testing time (in secs): ";
+    readerCheckTime = double(sscanf(input(promptReaderCheckTimeGet,'s'),'%f'));
+    while(isempty(readerCheckTime) || ~isa(readerCheckTime,'numeric') || (readerCheckTime < 0))
+        readerCheckTime = double(sscanf(input("Input Invalid. " + promptReaderCheckTimeGet,'s'),'%f'));
+    end
+end
+
+
+function [xAnchor, yAnchor, zAnchor] = expAnchorGet(varargin)
+    p = inputParser();
+    p.addParameter('zPadding','Y');
+    promptAnchorGet = "Enter the number of anchors: ";
+    anchNumber = uint32(sscanf(input(promptAnchorGet, 's'), '%d'));
+    while(isempty(anchNumber) || ~isa(anchNumber,'integer') || (anchNumber < 1))
+        anchNumber = uint32(sscanf(input("Input Invalid. " + promptAnchorGet, 's'), '%d'));
+    end
+    
+    %Intializing Anchor Position var
+    xAnchor = zeros(1,anchNumber);
+    yAnchor = zeros(1,anchNumber);
+    zAnchor = zeros(1,anchNumber);
+    uiwait(msgbox('Please confirm if you have completed position configuration for anchors',...
+    'Anchor Setup Confirmation!!!!','warn'));
+    
+    p.parse(varargin{:});
+    ZaxisZeroPadding = p.Results.zPadding;
+    for i = 1:anchNumber
+        xPrompt = sprintf("\t Enter x coordinate of anchor %d: ", i);
+        xIn = double(sscanf(input(xPrompt,'s'),'%f'));
+        while(isempty(xIn) || ~isa(xIn,'numeric'))
+            xIn = double(sscanf(input("Input Invalid. " + xPrompt,'s'),'%f'));
+        end
+        xAnchor(i) = xIn;
+        yPrompt = sprintf("\t Enter y coordinate of anchor %d: ", i);
+        yIn = double(sscanf(input(yPrompt,'s'),'%f'));
+        while(isempty(yIn) || ~isa(yIn,'numeric'))
+            yIn = double(sscanf(input("Input Invalid. " + yPrompt,'s'),'%f'));
+        end
+        yAnchor(i) = yIn;
+    end
+    if(~strcmpi(ZaxisZeroPadding, 'Y'))
+        for i = 1:anchNumber
+            zPrompt = sprintf("\t Enter z coordinate of anchor %d: ", i);
+            zIn = double(sscanf(input(zPrompt,'s'),'%f'));
+            while(isempty(zIn) || ~isa(zIn,'numeric'))
+                zIn = double(sscanf(input("Input Invalid. " + zPrompt,'s'),'%f'));
+            end
+            zAnchor(i) = zIn;
+        end
+    end
 end
 
 function ax = computeAxisLim(x_anch,y_anch)
