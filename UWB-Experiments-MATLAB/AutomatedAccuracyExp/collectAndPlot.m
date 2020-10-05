@@ -1,116 +1,104 @@
 function collectAndPlot()
-    global status expName;
-    status = "ST";  
+    global scriptStatus expName;
+    scriptStatus = "ST";  
     cleanup = onCleanup(@()myCleanup());
     try
         %Getting name of the experiment
         expName = input("Enter the name of the experiment: ",'s');
     
         %Checking if previous data of experiment is present
+        useExistingValues = "N";
         if exist(expName+"/LastExpVar.mat", 'file')
-            existingValues = input("Do you want to use existing experimental variables?(Y/N) ",'s');
-        else
-            existingValues = "N";
+            existingValuePrompt = "Do you want to use existing experimental variables?(Y/N) ";
+            useExistingValues = input(existingValuePrompt,'s');
+            while(~strcmpi(useExistingValues,"Y") && ~strcmpi(useExistingValues,"N"))
+                useExistingValues = input("Input invalid. " + existingValuePrompt,'s');
+            end
         end
         
-        if(strcmpi(existingValues,"Y"))
+        if(strcmpi(useExistingValues,"Y"))
             load(expName+"/LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
             
-        elseif(strcmpi(existingValues,"N"))
+        elseif(strcmpi(useExistingValues,"N"))
             %Getting experiment configuration
             [positions, duration, waitTime, readerCheckTime] = expConfigSetup();
             
             %Getting anchor information
+            %Z axis values of are zero-padded by default. 
+            %To input Z axis, use expAnchorGet('zPadding','N')
             [x_anch_pos, y_anch_pos] = expAnchorGet();
             
             %Ground truth
             x_true = zeros(1,positions);
             y_true = zeros(1,positions);
-
-        end 
-
-        posAnchor = zeros(1,2*length(x_anch_pos));
-        posAnchor(1:2:end) = x_anch_pos;posAnchor(2:2:end) = y_anch_pos;
-        fprintf("\n\n Position of archors in order " ); disp(1:1:length(x_anch_pos));
-        fprintf("\t(%0.2f,%0.2f)\n",posAnchor);
-       
-        
-        % Ask the tester to double check anchor's location
-        uiwait(msgbox(sprintf('Confirm Anchor Location: (x=%0.2f,y=%0.2f)\n', ...
-            posAnchor),'Anchor Setup Confirmation','warn'));
-        
-        % Writing files for the Positions
-        if(~strcmpi(existingValues,"Y"))
-            initialpos=1;
+            
+            % Writing files for the Positions
+            initialpos = 1;
             flag=0;
-            modeOfDataCollection = input("What is the mode of data collection? (SerialPort/MQTT): ",'s');
+            modeGetPrompt = "What is the mode of data collection? (Serial/MQTT): ";
+            modeOfDataCollection = input(modeGetPrompt,'s');
+            while(~strcmpi(modeOfDataCollection,"Serial") && ~strcmpi(modeOfDataCollection,"MQTT"))
+                modeOfDataCollection = input("Input invalid. " + modeGetPrompt,'s');
+            end
             mkdir (expName);
-            if(strcmpi(modeOfDataCollection,"SerialPort"))
-                serialPort = input("Enter the serial port name (string): ",'s');
-                s=serialport(serialPort,115200,"Timeout",30);
+            if(strcmpi(modeOfDataCollection,"Serial"))
+                serialPortName = input("Enter the serial port name (string): ",'s');
+                port = serialport(serialPortName,115200,"Timeout",30);
                 cd (expName);
-                WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,s,flag);
+                WritePosFileUsingSerialPort(initialpos,positions,...
+                    duration,waitTime,readerCheckTime,port,flag);
             elseif(strcmpi(modeOfDataCollection,"MQTT"))
-                fprintf("[Wi-Fi Backbone] Scanning the IP for tags in WLAN...\n");
-                [hostIp, subnetMask] = hostIpParse();
-                fprintf("[Wi-Fi Backbone] Host ip: " + hostIp + "; Subnet Mask: " + subnetMask + "\n");
-                [tagIp, tagMAC] = ipScan(hostIp, subnetMask);
-                fprintf("[Wi-Fi Backbone] Using the first found tag as the experiment object..." + "\n");
-                fprintf("[Wi-Fi Backbone] First tag ip found as: " + tagIp{1} + " MAC: " + tagMAC{1} + "\n");
-                ipaddress = string(tagIp{1});
-                tagId = input("Enter the tag ID :",'s');
-                tagId = string(tagId);
-                tagId = tagId.upper();
-                tcp = "tcp://";
-                tcp = tcp.append(ipaddress);
-                link = "Tag/";
-                link = link.append(tagId);
-                link = link.append("/Uplink/Location");
-                mQTT = mqtt(tcp); 
-                mysub = subscribe(mQTT,link);
+                [mqttObj, mysub] = tagMqttSubscriptionInit();
                 cd (expName);
-                WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,mysub,flag);
+                WritePosFileUsingMQTT(initialpos,positions,...
+                    duration,waitTime,readerCheckTime,mqttObj,mysub,flag);
             end
         end
         
-        %Skip ploting if we don't want it write now 
-        skipOrNot = input("Do you want to plot data rightnow?(Y/N) ",'s');
-        
-        if(strcmpi(skipOrNot,"Y"))
-             GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
-        else
-            cd ..
-            movefile(expName,'../LabOutdoor/');
-            disp("Moved files to LabOutdoor directory for future plotting \n")
+        %Skip ploting if we don't want it writen now 
+        plotNowPrompt = "Do you want to plot data rightnow?(Y/N) ";
+        plotNow = input(plotNowPrompt,'s');
+        while(~strcmpi(plotNow,"Y") && ~strcmpi(plotNow,"N"))
+            plotNow = input("Input invalid. " + plotNow,'s');
         end
+        
+        if(strcmpi(plotNow,"Y"))
+            GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
+        end
+        
+        cd ..
+        movefile(expName,'../LabOutdoor/');
+        disp("Moved files to LabOutdoor directory for future plotting \n")
         
    catch ME
        fprintf("\n"+ME.identifier);
        beep;
        rethrow(ME);
-       
    end
-   status = "FT";
+   scriptStatus = "FT";
 
 end
 
 function WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,readerCheckTime,sP,flag)
     try  
-        disp(initialpos + " " + positions);
+        fprintf("[Serialport] Collecting from Position %d, total Positions: %d", initialpos, positions);
+        initialpos = double(initialpos); positions = double(positions);
         for i = linspace(initialpos,positions,(positions-initialpos)+1)          
-            fprintf("Checking the status of serial port\n");
+            fprintf("[Serialport] Checking the status of serial port\n");
             initSerialIncomingBytes = sP.NumBytesAvailable;
             flush(sP);
             delayTimer(readerCheckTime);
+            
             if(initSerialIncomingBytes == sP.NumBytesAvailable)
-                ME = MException('Serialport:NoBytesAvailable', ...
-                'Listener Not in Reporting Mode');
-                beep;
-                throw(ME);
+                portHealthy = 0;
             else
-                fprintf("Status of serial port is healthy, data recording after wait time is over\n\n");
+                portHealthy = 1;
+            end
+                
+            if(portHealthy)
+                fprintf("[Serialport] Status of serial port is healthy, data recording after wait time is over\n\n");
                 fileName="pos"+string(i)+".txt";
-                disp(fileName+' ' + 'collecting in progress');
+                fprintf("[Serialport] " + fileName + " collecting in progress");
                 fileID = fopen(fileName,'w');
                 delayTimer(waitTime);
                 tStart=tic;%starts the timer
@@ -119,32 +107,35 @@ function WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,read
                     data = readline(sP);
                     fprintf(fileID,data+"\n");
                     if(toc(tStart)>duration*60)
-                        disp("Done with the file");
+                        disp("[Serialport] Done with the file");
                         while(i~=positions)
-                            confirmation = input("Please confirm location tag has changed? (Y/N) ", 's');    
-                            if(confirmation=="Y"||confirmation=="y")
+                            confirmation = input("[Serialport] Please confirm location tag has changed? (Y/N) ", 's');    
+                            if(strcmpi(confirmation, "Y"))
                                 break;
-                            else
-                                continue;
-                            end   
+                            end
                         end
                         break;
                     end
                 end
-            end 
+                
+            elseif(~portHealthy)
+                ME = MException('Serialport:NoBytesAvailable', ...
+                '[Serialport] Listener Not in Reporting Mode');
+                beep;
+                throw(ME);
+            end
         end
+        
     catch ME
         if(strcmp(ME.identifier,'Serialport:NoBytesAvailable'))
-        uiwait(msgbox('Please check the location of listener with respect to tag',...
-            'Reader Data Error!!!!','error'));
-        flag=flag+1;
-        disp(flag)
-        WritePosFileUsingSerialPort(i,positions,duration,waitTime,readerCheckTime,sP,flag)
+            uiwait(msgbox('Please check the location of listener with respect to tag',...
+                'Reader Data Error!!!!','error'));
+            flag=flag+1;
+            fprintf("[Serialport] flag: %d", flag);
+            WritePosFileUsingSerialPort(i,positions,duration,waitTime,readerCheckTime,sP,flag);
         else
-            rethrow(ME)
+            rethrow(ME);
         end
-        
-        
     end
     fclose("all");
 end
@@ -152,321 +143,73 @@ end
 
 
 
-function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,msub,flag)
+function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerCheckTime,mqttObj,msub,flag)
     try  
-        disp(initialpos + " " + positions);
+        fprintf("[MQTT/Wi-Fi Backbone] Collecting from Position %d, total Positions: %d\n", initialpos, positions);
+        initialpos = double(initialpos); positions = double(positions);
         pause(1);
         for i = linspace(initialpos,positions,(positions-initialpos)+1)          
-            fprintf("Checking the status of subscriber\n");
+            fprintf("[MQTT/Wi-Fi Backbone] Checking the status of subscriber\n");
             sampleData = jsondecode(read(msub));
             initFrameNumeber = sampleData.superFrameNumber;
             delayTimer(readerCheckTime);
+            
             if(initFrameNumeber == jsondecode(read(msub)).superFrameNumber)
-                ME = MException('myComponent:inputErrorMQTT', ...
-                    'Data received is not updated reconnecting');
-                    beep;
-                    throw(ME);
+                mqttHealthy = 0;
             else
-                fprintf("Status of mqtt subcriber is healthy, data recording after wait time is over\n\n");
+                mqttHealthy = 1;
+            end
+            
+            if(mqttHealthy)
+                fprintf("[MQTT/Wi-Fi Backbone] Status of mqtt subcriber is healthy, data recording after wait time is over\n\n");
                 fileName="pos"+string(i)+".txt";
-                disp(fileName+' ' + 'collecting in progress');
+                fprintf("[MQTT/Wi-Fi Backbone] " + fileName + " collecting in progress");
                 fileID = fopen(fileName,'w');
                 delayTimer(waitTime);
                 tStart=tic;%starts the timer
-                temp = 0;
+                lastSuperFrameNbr = 0;
                 while(true)
                     pause(0.001)
                     positionData = jsondecode(read(msub));
-                    disp(positionData);
-                    if(~(temp == positionData.superFrameNumber))
-                        temp = positionData.superFrameNumber;
+                    if(lastSuperFrameNbr ~= positionData.superFrameNumber)
+                        lastSuperFrameNbr = positionData.superFrameNumber;
                         tag = extractBetween(positionData.tag_id,strlength(positionData.tag_id)-3,strlength(positionData.tag_id));
-                    data = "POS,0," + tag +","+positionData.est_pos.x+","+positionData.est_pos.y+","+positionData.est_pos.z+","+positionData.est_qual+","+"x0A"+","+positionData.superFrameNumber;
+                        data = "POS,0," + tag +","+positionData.est_pos.x+","+positionData.est_pos.y+","+positionData.est_pos.z+","+positionData.est_qual+","+"x0A"+","+positionData.superFrameNumber;
                         fprintf(fileID,data+"\n");
                         if(toc(tStart)>duration*60)
-                            disp("Done with the file");
+                            disp("[MQTT/Wi-Fi Backbone] Done with the file");
                             while(i~=positions)
-                                confirmation = input("Please confirm location tag has changed? (Y/N) ", 's');    
-                                if(confirmation=="Y"||confirmation=="y")
+                                confirmation = input("[MQTT/Wi-Fi Backbone] Please confirm location tag has changed? (Y/N) ", 's');    
+                                if(strcmpi(confirmation, "Y"))
                                     break;
-                                else
-                                    continue;
                                 end   
                             end
                             break;
                         end
                     end
                 end
-            end 
+                
+            elseif(~mqttHealthy)
+                ME = MException('myComponent:inputErrorMQTT', ...
+                    '[MQTT/Wi-Fi Backbone] Data received is not updated reconnecting');
+                    beep;
+                    throw(ME);    
+            end
         end
     catch ME
         if(strcmp(ME.identifier,'myComponent:inputErrorMQTT'))
-        uiwait(msgbox('Please check the subcriber status manually',...
-            'Reader Data Error!!!!','error'));
-        flag=flag+1;
-        disp(flag)
-        WritePosFileUsingMQTT(i,positions,duration,waitTime,readerCheckTime,msub,flag)
+            uiwait(msgbox('Please check the subcriber status manually',...
+                'Reader Data Error!!!!','error'));
+            flag=flag+1;
+            fprintf("[MQTT/Wi-Fi Backbone] flag: %d", flag);
+            WritePosFileUsingMQTT(i,positions,duration,waitTime,readerCheckTime,mqttObj,msub,flag);
         else
-            rethrow(ME)
+            rethrow(ME);
         end   
     end
     fclose("all");
 end
 
-
-
-function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
-    global expName;
-    %Getting coordinates of positions 
-    method = input("Do you have actual coordinates of positions?(Y/N) ",'s');
-    if(strcmpi(method,"Y"))
-        for i = 1:size(x_true,2)
-        xPrompt = sprintf("\t Enter x coordinate of Position %d :", i);
-        x_true(i) = input(xPrompt);
-        yPrompt = sprintf("\t Enter y coordinate of Position %d :", i);
-        y_true(i) = input(yPrompt);     
-        end 
-
-    elseif(strcmpi(method,"N"))
-        disp("We will be using triangulation for getting coordinates.")
-
-        allSame = input("Do you plan to use same anchors for reference?(Y/N) ",'s');
-        if(strcmpi(allSame,"Y"))
-            anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
-                +"reference in order e.g. [1 2] or [1 2 3] for positions: ");
-            anchorNumber = input(anchorNumberPrompt);                    
-        end
-
-        for i = 1:size(x_true,2)
-            if(strcmpi(allSame,"N"))
-                anchorNumberPrompt = sprintf("\t Enter anchor number you want to use as "...
-                +"reference in order e.g. [1 2] or [1 2 3] for position %d : ", i);
-                anchorNumber = input(anchorNumberPrompt);
-            end    
-            distanceFromAnchorPrompt = sprintf("\t Enter distance "...
-            +"of tag from those anchor in same order [d1 d2] or [d1 d2 d3] for position %d : ", i);
-            distanceFromAnchor = input(distanceFromAnchorPrompt);
-            coordinates = triangulationForCordinates(anchorNumber,distanceFromAnchor,x_anch_pos,y_anch_pos);
-            x_true(i) = coordinates(1);
-            y_true(i) = coordinates(2);       
-        end    
-    end
-    cd (expName)
-    dinfo = dir('pos*.txt');
-    filenames = {dinfo.name};
-    Xerror=zeros(1,1);
-    Yerror=zeros(1,1);
-    x_tag_pos_avg=zeros(1,length(filenames));
-    y_tag_pos_avg=zeros(1,length(filenames));
-    x_tag_pos_std=zeros(1,length(filenames));
-    y_tag_pos_std=zeros(1,length(filenames));
-    for K = 1 : length(filenames)
-        thisfile = filenames{K};
-        display(thisfile);
-        %read the raw file as matrix first row is ignored
-		pos1 = readmatrix(thisfile);
-        %extracted X and Y coordinates from the file 
-		pos1 = pos1(:,4:5);
-		pos1 = pos1(all(~isnan(pos1),2),:);
-        Xerror = [Xerror;(pos1(:,1) - x_true(K))];
-        Yerror = [Yerror;(pos1(:,2) - y_true(K))];
-        avgPos1 = mean(pos1);
-        stdPos1 = std(pos1);
-        x_tag_pos_avg(1,K) = avgPos1(1,1);
-        y_tag_pos_avg(1,K) = avgPos1(1,2);
-        x_tag_pos_std(1,K) = stdPos1(1,1);
-        y_tag_pos_std(1,K) = stdPos1(1,2);
-    end
-    
-    figure(1);
-    histogram(Xerror);
-    xlabel('Errors in X coordinate (m)');
-    figure(2);
-    saveas(gcf,'XERROR.png');
-    histogram(Yerror);
-    xlabel('Errors in Y coordinate (m)');
-    saveas(gcf,'YERROR.png');
-    save('Error','Xerror','Yerror');
-    save("LastExpVar","x_anch_pos","y_anch_pos","x_true","y_true");
-pos_plot(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
-    x_anch_pos, y_anch_pos, expName);
-pos_errorbar(x_true, y_true, x_tag_pos_avg, y_tag_pos_avg, x_tag_pos_std,y_tag_pos_std,...
-    x_anch_pos, y_anch_pos, expName);
-    cd ..;
-end
-
-
-
-function pos_plot(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
-    x_anch, y_anch, title_name)
-    % function call to plot according to different data, using oval for std.
-    % NO NEED TO COMMENT/UNCOMMENT
-    % Display plot while done
-    
-%     % To be used for blockage scenario
-%     BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
-%     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
-    axs = computeAxisLim(x_anch, y_anch);
-    figure(3);
-    box on;
-    set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
-    ax=gca;
-    ax.XTickMode = 'auto';
-    ax.YTickMode = 'auto';
-    hold on;
-    % Plot the dummy handles for legend
-    std_1 = plot(nan, nan, 'bo', 'MarkerFaceColor','b');
-    %buff = plot(nan, nan, 'LineStyle','--', 'Color','m');
-
-    % Plot the std. deviation for all data points
-    for i = 1:1:length(x_true)
-        theta = 0 : 0.01 : 2*pi;
-        xcenter = x_measure(i);
-        ycenter = y_measure(i);
-        xradius = x_std(i);
-        yradius = y_std(i);
-        x_s = xradius * cos(theta) + xcenter;
-        y_s = yradius * sin(theta) + ycenter;
-        fill(x_s,y_s,'b','facealpha',0.3);
-        hold on
-    end
-
-    % Plot the connection from truth to measurements
-    for i = 1:1:length(x_true)
-        quiver(x_true(i), y_true(i), ...
-            x_measure(i)-x_true(i), ...
-            y_measure(i)-y_true(i),...
-            'color','k','LineStyle',':','LineWidth',0.3);
-        hold on
-    end
-
-    % Plot the anchor positions
-    anch = plot(x_anch, y_anch, 'b^');
-    % Plot the buffer (+-10cm) for decawave
-    centers = [x_true' y_true'];
-    radii = repelem(0.1,length(x_true),1);
-    buff=viscircles(centers,radii,'LineStyle','--','Color','m');
-    
-    if(contains(title_name,"Blocked"))
-        % Need to specify the BLOCKAGE*_POS
-        % TODO(none-urgent): Provide a flexible interface to allow
-        % different number of blockages (and their positions)
-        rectangle('Position',BLOCKAGE1_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
-        rectangle('Position',BLOCKAGE2_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
-    end
-    % Plot the true positions of tags
-    plot_true_pos = plot(x_true, y_true, 'r*');
-    % Plot the measured positions of tags
-    plot_measured = plot(x_measure, y_measure,'ksq');
-    axis(axs);
-    daspect([1 1 1]);
-    grid on;
-    l = legend([plot_true_pos,plot_measured,std_1,anch,buff],...
-        'True Position','Measured Position','Standard Deviation (Oval)',...
-        'Anchor', 'Accuracy Buffer (+-0.1m)');
-    set(l, 'Location', 'southeast');
-    title(title_name);
-    xlabel('X coordinate (m)');
-    ylabel('Y coordinate (m)');
-    hold off;
-    legend boxon
-
-end
-
-
-
-function pos_errorbar(x_true, y_true, x_measure, y_measure, x_std, y_std, ...
-    x_anch, y_anch, title_name)
-    % function call to plot according to different data, using errorbar for std.
-    % NO NEED TO COMMENT/UNCOMMENT
-    % Display plot while done
-    
-%     % To be used for blockage scenario
-%     BLOCKAGE1_POS = [0.1, 0.98,0.02,0.3];
-%     BLOCKAGE2_POS = [2.2, 0.98,0.02,0.3];
-      
-    axs = computeAxisLim(x_anch, y_anch);
-    figure(4);
-    set(gcf,'unit','normalized','position',[0.2, 0.2, 0.5, 0.5]);
-    ax=gca;
-    ax.XTickMode = 'auto';
-    ax.YTickMode = 'auto';
-    e1 = errorbar(x_measure, y_measure, y_std, y_std, x_std, x_std,...
-        'ksq');
-    hold on;
-    % Plot the anchor positions
-    anch = plot(x_anch, y_anch, 'b^');
-    % Plot the buffer (+-10cm) for decawave
-    centers = [x_true' y_true'];
-    radii = repelem(0.1,length(x_true),1);
-    buff=viscircles(centers,radii,'LineStyle','--','Color','m');
-    
-    if(contains(title_name,"Blocked"))
-        % Need to specify the BLOCKAGE*_POS
-        % TODO(none-urgent): Provide a flexible interface to allow
-        % different number of blockages (and their positions)
-        rectangle('Position',BLOCKAGE1_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
-        rectangle('Position',BLOCKAGE2_POS, 'EdgeColor','k', 'FaceColor', 'k', 'Curvature', 0.2,'LineWidth',0.3);
-    end
-    
-    true_pos = plot(x_true, y_true, 'r*');
-    % Plot the connection from truth to measurements
-    for i = 1:1:length(x_true)
-        quiver(x_true(i), y_true(i), ...
-            x_measure(i)-x_true(i), ...
-            y_measure(i)-y_true(i),...
-            'color','k','LineStyle',':','LineWidth',0.3);
-        hold on
-    end
-    daspect([1 1 1]);
-    grid on;
-    l = legend([true_pos,e1,buff,anch],'True Position','Measured Position','Accuracy Buffer (+-0.1m)','Anchor');
-    set(l, 'Location', 'southeast');
-    axis(axs);
-    title(title_name);
-    xlabel('X coordinate (m)');
-    ylabel('Y coordinate (m)');
-    
-end
-
-% function calculates the ground-truth tag coordinates 
-% according to surveyed results in experiments (solving equation set)
-% Options: two-point surveying & three-point surveying
-function coordinates = triangulationForCordinates(aNum,ds,xAP,yAP)
-
-    syms x y;
-    coordinates = zeros(1,2);
-    ref = length(aNum);
-
-    if ref == 2
-        x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(2));
-        d1 = ds(1); d2 = ds(2);
-        eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
-        eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
-        
-        if aNum(1) == 1
-            S = solve(eq1,eq2,x>=x1,y>=y1);
-        elseif aNum(1) == 2 
-            S = solve(eq1,eq2,x<=x1,y>=y1);
-        elseif aNum(1) == 3 
-            S = solve(eq1,eq2,x<=x1,y<=y1);
-        end
-        coordinates = [double(S.x) double(S.y)];
-
-
-    elseif ref == 3
-        x1 = xAP(aNum(1));y1 = yAP(aNum(1));x2 = xAP(aNum(2));y2 = yAP(aNum(2));
-        x3 = xAP(aNum(3));y3 = yAP(aNum(3));
-        d1 = ds(1); d2 = ds(2);d3 = ds(3);
-        eq1 = (x-x1)^2 + (y-y1)^2 == d1^2;
-        eq2 = (x-x2)^2 + (y-y2)^2 == d2^2;
-        eq3 = (x-x3)^2 + (y-y3)^2 == d3^2;
-        S = solve(eq1,eq2,eq3);
-        coordinates = [double(S.x) double(S.y)];    
-    end
-
-
-end
 
 function [positions, duration, waitTime, readerCheckTime] = expConfigSetup()
     %Getting number of the positions
@@ -491,7 +234,7 @@ function [positions, duration, waitTime, readerCheckTime] = expConfigSetup()
     end
 
     %Getting time to verify reader operation 
-    promptReaderCheckTimeGet = "Enter the listener testing time (in secs): ";
+    promptReaderCheckTimeGet = "Enter the reader check testing time (in secs): ";
     readerCheckTime = double(sscanf(input(promptReaderCheckTimeGet,'s'),'%f'));
     while(isempty(readerCheckTime) || ~isa(readerCheckTime,'numeric') || (readerCheckTime < 0))
         readerCheckTime = double(sscanf(input("Input Invalid. " + promptReaderCheckTimeGet,'s'),'%f'));
@@ -541,15 +284,38 @@ function [xAnchor, yAnchor, zAnchor] = expAnchorGet(varargin)
             zAnchor(i) = zIn;
         end
     end
+    
+    posAnchor = zeros(1,2*length(xAnchor));
+    posAnchor(1:2:end) = xAnchor;
+    posAnchor(2:2:end) = yAnchor;
+    fprintf("\n\n Position of archors in order " ); 
+    disp(1:1:length(xAnchor));
+    fprintf("\t(%0.2f,%0.2f)\n",posAnchor);
+    % Ask the tester to double check anchor's location
+    uiwait(msgbox(sprintf('Confirm Anchor Location: (x=%0.2f,y=%0.2f)\n', ...
+        posAnchor),'Anchor Setup Confirmation','warn'));
 end
 
-function ax = computeAxisLim(x_anch,y_anch)
-    % Specify the axis limits of the plot according to the range of anchors
-    ax=zeros(1,4);
-    ax(1) = min(x_anch)-5;
-    ax(2) = max(x_anch)+5;
-    ax(3) = min(y_anch)-5;
-    ax(4) = max(y_anch)+5;
+
+function [mqttObj, mqttSub] = tagMqttSubscriptionInit()
+    fprintf("[MQTT/Wi-Fi Backbone] Scanning the IP for tags in WLAN...\n");
+    [hostIp, subnetMask] = hostIpParse();
+    fprintf("[MQTT/Wi-Fi Backbone] Host ip: " + hostIp + "; Subnet Mask: " + subnetMask + "\n");
+    [tagIp, tagMAC] = ipScan(hostIp, subnetMask);
+    fprintf("[MQTT/Wi-Fi Backbone] Using the first found tag as the experiment object..." + "\n");
+    fprintf("[MQTT/Wi-Fi Backbone] First tag ip found as: " + tagIp{1} + " MAC: " + tagMAC{1} + "\n");
+    ipaddress = string(tagIp{1});
+    tagId = input("Enter the tag ID :",'s');
+    tagId = string(tagId);
+    tagId = tagId.upper();
+    tcp = "tcp://";
+    tcp = tcp.append(ipaddress);
+    link = "Tag/";
+    link = link.append(tagId);
+    link = link.append("/Uplink/Location");
+    
+    mqttObj = mqtt(tcp); 
+    mqttSub = subscribe(mqttObj,link);
 end
 
 function delayTimer(delayInSec)
@@ -568,7 +334,6 @@ function delayTimer(delayInSec)
     start(T);
     pause(delayInSec);
 end
-
 
 function myCleanup()
     global expName status
