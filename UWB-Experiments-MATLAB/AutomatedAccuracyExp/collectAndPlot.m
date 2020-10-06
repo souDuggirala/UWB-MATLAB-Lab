@@ -100,7 +100,7 @@ function WritePosFileUsingSerialPort(initialpos,positions,duration,waitTime,read
                 fileName="pos"+string(i)+".txt";
                 fprintf("[Serialport] " + fileName + " collecting in progress");
                 fileID = fopen(fileName,'w');
-                delayTimer(waitTime);
+                delayTimer(duration*60);
                 tStart=tic;%starts the timer
                 flush(sP);
                 while(true)
@@ -165,7 +165,7 @@ function WritePosFileUsingMQTT(initialpos,positions,duration,waitTime,readerChec
                 fileName="pos"+string(i)+".txt";
                 fprintf("[MQTT/Wi-Fi Backbone] " + fileName + " collecting in progress");
                 fileID = fopen(fileName,'w');
-                delayTimer(waitTime);
+                delayTimer(duration*60);
                 tStart=tic;%starts the timer
                 lastSuperFrameNbr = 0;
                 while(true)
@@ -318,6 +318,7 @@ function [mqttObj, mqttSub] = tagMqttSubscriptionInit()
     mqttSub = subscribe(mqttObj,link);
 end
 
+
 function delayTimer(delayInSec)
     % UI function to display elapsed time in dots
     totalTasks = 50;
@@ -334,6 +335,7 @@ function delayTimer(delayInSec)
     start(T);
     pause(delayInSec);
 end
+
 
 function myCleanup()
     global expName status
