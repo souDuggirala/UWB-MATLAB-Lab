@@ -8,17 +8,10 @@ try:
 except:
     pass
 
-def hexShow(argv):        # display in hexadecimal format 
-    result = ''  
-    hLen = len(argv)  
-    for i in range(hLen):
-        hvol = argv[i]
-        print('idx: ',i,' ','item: ',repr(hvol))
-        hhex = format(hvol, '02x')
-        result += hhex+' '  
-    print('hexShow:',result)
+def hex_show(bytes_to_show):       
+    return ''.join('{:02x} '.format(letter) for letter in bytes_to_show)
 
-t = serial.Serial("COM6", baudrate=115200, timeout=3.0)
+t = serial.Serial("COM9", baudrate=115200, timeout=3.0)
 print(t.portstr)
 tag = t.write(b'\x30')
 length = t.write(b'\x00')
@@ -31,5 +24,6 @@ time.sleep(1)
 num=t.inWaiting()
 if num:
     str = t.read(num)
-    hexShow(str)
+    print(hex_show(str))
+    
 serial.Serial.close(t)

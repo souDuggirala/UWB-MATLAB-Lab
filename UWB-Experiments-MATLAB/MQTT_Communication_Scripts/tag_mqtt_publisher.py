@@ -136,6 +136,13 @@ def make_json_dic(raw_string):
     # les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
     # lep\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
     # lec\n: POS,7.10,5.24,-2.03,53
+    # TODO: adapt for listener's input. Listener's input is a little different
+    # Listener data sample input: (Listner's input contains tag identifiers)
+    # les\n: [256762.460 INF] loc_data: 1
+    #  0) D09C[5.85,4.33,-1.97,65,x07]
+    #  1) 9421[5.34,4.12,-1.31,63,x09]
+    # lec\n: POS,0,D09C,5.85,4.33,-1.96,65,x07
+    # lep\n: the same as lec\n
     data = {}
     # parse csv
     raw_elem = raw_string.split(',')

@@ -2,66 +2,23 @@ from time import sleep
 import serial
 import time
 
-
-#---------------------------------------------------------
-# helper functions start
-
-def SHOW_OPE_INFO(port,info1,info2):
-
-    print("USING",port)
-    print("written to serial: ", info1,type(b'\x01'))
-    print("written to serial: ", info2,type(b'\x01'))
-
-def hexShow(argv):       
-
-    result = []
-    hLen = len(argv)  
-    for i in range(hLen):
-        hvol = argv[i]
-        hhex = format(hvol, "02x")
-        result.append(hex(int(hhex,16)))  
-    
-    print('hexShow:',result)
-    return result
+# Show hexadecimal in string format
+def hex_show(bytes_to_show):
+    return ''.join('0x{:02x},'.format(letter) for letter in bytes_to_show)
 
 
     
 # convert decimal num to byte
-def decimalTobytes(coordinate,qf,unit="mm"):
-    def decimalTohex(num):
-        if num > 2**32-1 or num<0:
-            print("invalidInput")
-        hexnum=hex(num)
-        i = len(hexnum)-1
-        hexArray=[b'\x00']*4
-        temp=""
-        index=0
-        while i>1:
-            temp=hexnum[i]+temp
-            i-=1
-            if len(temp)==2:
-                # temp='\x'+temp
-                hexArray[index]=bytes.fromhex(temp)
-                index+=1
-                temp=""
-        if len(temp)==1:
-            hexArray[index]=bytes.fromhex('0'+temp)
-        return hexArray
-
-
+def decimalTobytes(coords, qual_fact_percent, unit="mm"):
+    if unit not in ("mm", "cm", "m"):
+        raise ValueError("Invalid Input Unit")
     scale={"mm":1,"cm":10,"m":1000}
-    if unit not in scale:
-        print("invalid unit")
-        return [b'\x00',b"\x00",b"\x00",b"\x00",b"\x00",b"\x00",b"\x00",b"\x00",b"\x00",b"\x00",b"\x00",b"\x00",b"\x00"]
-
-    x,y,z=coordinate*scale[unit]
-    
-    pos=[]
-    pos.extend(decimalTohex(x))
-    pos.extend(decimalTohex(y))
-    pos.extend(decimalTohex(z))
-    pos.append(bytes.fromhex(hex(qf)[2:4]))
-
+    x, y, z = coords * scale[unit]
+    pos = b''
+    pos += x.to_bytes(4, byteorder='little', signed=True)
+    pos += y.to_bytes(4, byteorder='little', signed=True)
+    pos += z.to_bytes(4, byteorder='little', signed=True)
+    pos += qual_fact_percent.to_bytes(1, byteorder='little', signed=False)
     return pos
 
 def hexTodemical(argv):
@@ -83,52 +40,48 @@ def hexTodemical(argv):
 #------------------------------------------------------------------------------------------#
 # DWM1001 API functions start
 
-def dwm_pos_set(position,qf,t):        # display in hexadecimal format 
+def dwm_pos_set(t, coords, qual_fact_percent, unit="mm"):        # display in hexadecimal format 
+    t.reset_input_buffer()
+    TYPE = b'\x01'
+    LENGTH = b'\x0D'
 
-    TYPE=b'\x01'
-    LENGTH=b'\x0D'
-    # t.write(TYPE)
-    # t.write(LENGTH)
-    t.write(TYPE + LENGTH)
+    if unit not in ("mm", "cm", "m"):
+        raise ValueError("Invalid Input Unit")
+    scale={"mm":1,"cm":10,"m":1000}
+
+    [x, y, z]= [c* scale[unit] for c in coords]
+    pos_bytes = b''
+    pos_bytes += x.to_bytes(4, byteorder='little', signed=True)
+    pos_bytes += y.to_bytes(4, byteorder='little', signed=True)
+    pos_bytes += z.to_bytes(4, byteorder='little', signed=True)
+    pos_bytes += qual_fact_percent.to_bytes(1, byteorder='little', signed=False)
+    VALUE = pos_bytes
+    input_bytes = TYPE + LENGTH + VALUE
+    t.write(input_bytes)
     
-    SHOW_OPE_INFO(t.portstr,TYPE,LENGTH)
-    print(len(decimalTobytes(position,qf)))
-    for pos in decimalTobytes(position,qf):
-        t.write(pos)
-        print("written to serial: ", pos,type(b'\x01'))
-        time.sleep(0.1)
-
-    time.sleep(1)
-    num=t.inWaiting()
-    print(num)
-    if num:
-        str=t.read(num)
-        # serial.Serial.close(t)
-
-        if format(str[-1],"02x")=="01":
-            print("error")
-        else:
-            print("set success")
+    print("written to serial: ",input_bytes)
+    returned_values = t.read(3)
+    print(hex_show(returned_values))
+    if format(returned_values[-1],"02x")=="01":
+        print("error")
+    else:
+        print("set success")
 
 
          
 def dwm_pos_get(t):        # display in hexadecimal format and decimal format 
-
     TYPE=b'\x02'
     LENGTH=b'\x00'
     # t.write(TYPE)
     # t.write(LENGTH)
     t.write(TYPE + LENGTH)
-
-    SHOW_OPE_INFO(t.portstr,TYPE,LENGTH)
-
     time.sleep(1)
     num=t.inWaiting()
     print(num)
     if num:
         str=t.read(num)
         # serial.Serial.close(t)
-        hexvalue=hexShow(str)
+        hexvalue=hex_show(str)
         print("hexvalue: ", hexvalue)
         x,y,z,qf = hexTodemical(hexvalue[5:9]),hexTodemical(hexvalue[9:13]),hexTodemical(hexvalue[13:17]),int(hexvalue[-1],16)
         print('x:',hexvalue[5:9],"y:",hexvalue[9:13],"z:",hexvalue[13:17],"qf:",qf)
@@ -157,7 +110,7 @@ def dwm_upd_rate_get(t):
     if num:
         str = t.read(num)
         serial.Serial.close(t)
-        hexvalue=hexShow(str)   
+        hexvalue=hex_show(str)   
 
 #################################
 #######################----------
@@ -292,7 +245,7 @@ def dwm_nodeid_get(t):
     if num:
         str = t.read(num)
         serial.Serial.close(t)
-        hexShow(str)
+        hex_show(str)
 
 def dwm_status_get():
     return -1 

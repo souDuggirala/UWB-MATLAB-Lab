@@ -1,3 +1,4 @@
 .ipynb_checkpoints/
 *.asv
 UWB-Experiments-MATLAB/.DS_Store
+*.pyc
