@@ -1,11 +1,45 @@
-from time import sleep
-import serial
-import time
+import time, serial
+import inspect
+
+
+ERROR_CLS = {
+        0 : "OK",
+        1 : "unknown command or broken TLV frame",
+        2 : "internal error",
+        3 : "invalid parameter",
+        4 : "busy",
+        5 : "operation not permitted",
+    }
+
+SCALE_TO_MM = {
+        "mm"    : 1,
+        "cm"    : 10,
+        "m"     : 1000,
+        }
+
+SCALE_TO_100MS = {
+        "100ms" : 1,
+        "s"     : 10,
+        "min"   : 600,
+        }
 
 # Show hexadecimal in string format
 def hex_in_string(bytes_to_show):
     return ''.join('0x{:02x} '.format(letter) for letter in bytes_to_show)
 
+def verbose_request(TLV_bytes):
+    _func_name = inspect.stack()[1][3]
+    print("[{}] TLV Written to serial: {}".format(_func_name, hex_in_string(TLV_bytes)))
+
+def verbose_response(TLV_bytes, err_code=1):
+    _func_name = inspect.stack()[1][3]
+    print("[{}] Responded TLV: {}".format(_func_name, hex_in_string(TLV_bytes)))
+    if err_code == 0:
+        print("[{}] Success".format(_func_name))
+    else:
+        print("[{}] Error; error code: {}, message: {}"
+        .format(_func_name, err_code, ERROR_CLS[err_code]))
+    
 
 def hexTodemical(argv):
 
@@ -26,83 +60,176 @@ def hexTodemical(argv):
 #------------------------------------------------------------------------------------------#
 # DWM1001 API functions start
 
-def dwm_pos_set(t, coords, qual_fact_percent, unit="mm"):        # display in hexadecimal format 
-    TYPE = b'\x01'
-    LENGTH = b'\x0D'
-    VALUE = b''
-    if unit not in ("mm", "cm", "m"):
-        raise ValueError("Invalid Input Unit")
-    scale={"mm":1,"cm":10,"m":1000}
+def dwm_pos_set(t, coords, qual_fact_percent, unit="mm", verbose=False):
+    """ API Section 5.3.1
+    API Sample TLV Request:
+    Type    |Length |Value-position
+    0x01    |0x0D   |x (4B, little), y (4B, little), z (4B, little), 
+                    |percentage quality factor (1B)
 
-    [x, y, z] = coords_in_mm = [c* scale[unit] for c in coords]
+    API Sample TLV Resonse:
+    Type    |Length |Value-err_code
+    0x40    |0x01   |0x00
+    ------------------------------------
+    :return: 
+        error_code
+    """ 
+    _func_name = inspect.stack()[0][3]
+    if unit not in ("mm", "cm", "m"):
+        raise ValueError("[{}]: Invalid input unit".format(_func_name))
+    
+    TYPE, LENGTH, VALUE = b'\x01', b'\x0D', b''
+    
+    [x, y, z] = [c * SCALE_TO_MM[unit] for c in coords]
     pos_bytes = b''
-    pos_bytes += x.to_bytes(4, byteorder='little', signed=True)
-    pos_bytes += y.to_bytes(4, byteorder='little', signed=True)
-    pos_bytes += z.to_bytes(4, byteorder='little', signed=True)
+    for dim in [x, y, z]:
+        pos_bytes += dim.to_bytes(4, byteorder='little', signed=True)
     pos_bytes += qual_fact_percent.to_bytes(1, byteorder='little', signed=False)
     
     VALUE = pos_bytes
-    
     output_bytes = TYPE + LENGTH + VALUE
     
-    t.reset_output_bytes_buffer()
+    t.reset_output_buffer()
+    t.reset_input_buffer()
     t.write(output_bytes)
+    if verbose:
+        verbose_request(output_bytes)   
+    TLV_response = t.read(3)
+    err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 1
+    if verbose:
+        verbose_response(TLV_response, err_code)
+    # Parsing the returned TLV value
+    # do nothing
+    return err_code
+
+
+def dwm_pos_get(t, verbose=False):
+    """ API Section 5.3.2
+    API Sample TLV Request:
+    Type    |Length
+    0x02    |0x00  
+
+    API Sample TLV Resonse:
+    Type    |Length |Value-err_code |...
+    0x40    |0x01   |0x00           |...
+    Type    |Length |Value-position
+    0x41    |0x0D   |x (4B, little), y (4B, little), z (4B, little), 
+                    |percentage quality factor (1B)
+    ------------------------------------
+    :return: 
+        [x, y, z, qual_fact_percent, err_code] unit in millimeter
+    """ 
+    _func_name = inspect.stack()[0][3]
+    TYPE, LENGTH, VALUE = b'\x02', b'\x00', b''  
+    output_bytes = TYPE + LENGTH + VALUE
+
+    t.reset_output_buffer()
+    t.reset_input_buffer()
+    t.write(output_bytes)
+    if verbose:
+        verbose_request(output_bytes)
+    TLV_response = t.read(18)
+    err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 1
+    if verbose:
+        verbose_response(TLV_response, err_code)
     
-    print("written to serial: ", output_bytes)
-    returned_values = t.read(3)
-    print(hex_in_string(returned_values))
-    if format(returned_values[-1],"02x")=="01":
-        print("error")
-    else:
-        print("set success")
+    # Parsing the returned TLV value
+    _dim_idx_pos = [5, 9, 13]
+    x, y, z, qual_fact_percent = [float("nan")] * 4
+    [x, y, z] = [
+        int.from_bytes(dim_bytes, byteorder='little', signed=True) 
+        for dim_bytes in [TLV_response[idx:idx+4] for idx in _dim_idx_pos]
+        ]
+    qual_fact_percent = TLV_response[-1]
+
+    return [x, y, z, qual_fact_percent, err_code]
 
 
-         
-def dwm_pos_get(t):        # display in hexadecimal format and decimal format 
-    TYPE=b'\x02'
-    LENGTH=b'\x00'
-    # t.write(TYPE)
-    # t.write(LENGTH)
-    t.write(TYPE + LENGTH)
-    time.sleep(1)
-    num=t.inWaiting()
-    print(num)
-    if num:
-        str=t.read(num)
-        # serial.Serial.close(t)
-        hexvalue=hex_in_string(str)
-        print("hexvalue: ", hexvalue)
-        x,y,z,qf = hexTodemical(hexvalue[5:9]),hexTodemical(hexvalue[9:13]),hexTodemical(hexvalue[13:17]),int(hexvalue[-1],16)
-        print('x:',hexvalue[5:9],"y:",hexvalue[9:13],"z:",hexvalue[13:17],"qf:",qf)
-        print('x:',x,"y:",y,"z:",z,"qf:",qf)
+def dwm_upd_rate_set(t, act_upd_intval, sta_upd_intval, unit="100ms", verbose=False):
+    """ API Section 5.3.3
+    API Sample TLV Request:
+    Type    |Length |Value-update_rate
+    0x03    |0x04   |active/stationary position update interval in multiples
+                    |of 100 milliseconds (2B each, little, unsigned)
 
-###################################
-#########################----------
-def dwm_upd_rate_set(rate,t):
-    return -1
-########################-----------
-###################################
+    API Sample TLV Resonse:
+    Type    |Length |Value-err_code
+    0x40    |0x01   |0x00
+    ------------------------------------
+    :return: 
+        error_code
+    """ 
+    _func_name = inspect.stack()[0][3]
+    if unit not in ("100ms", "s", "min"):
+        raise ValueError("[{}]: Invalid input unit".format(_func_name))
+    
+    TYPE, LENGTH, VALUE = b'\x03', b'\x04', b''
+    
+    [act_upd_intval, sta_upd_intval] = [i * SCALE_TO_100MS[unit] 
+                                for i in [act_upd_intval, sta_upd_intval]]
+    if act_upd_intval > sta_upd_intval:
+        raise ValueError("[{}]: Stationary interval must be greater or equal to \
+                          Active interval".format(_func_name))
+    upd_bytes = b''
+    for upd in [act_upd_intval, sta_upd_intval]:
+        upd_bytes += upd.to_bytes(2, byteorder='little', signed=False)
+    
+    VALUE = upd_bytes
+    output_bytes = TYPE + LENGTH + VALUE
+    
+    t.reset_output_buffer()
+    t.reset_input_buffer()
+    t.write(output_bytes)
+    if verbose:
+        verbose_request(output_bytes)   
+    TLV_response = t.read(3)
+    err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 1
+    if verbose:
+        verbose_response(TLV_response, err_code)
+    # Parsing the returned TLV value
+    # do nothing
+    return err_code
 
-def dwm_upd_rate_get(t):
+def dwm_upd_rate_get(t, verbose=False):
+    """ API Section 5.3.4
+    API Sample TLV Request:
+    Type    |Length
+    0x04    |0x00  
 
-    TYPE=b'\x04'
-    LENGTH=b'\x00'
-    # t.write(TYPE)
-    # t.write(LENGTH)
-    t.write(TYPE + LENGTH)
+    API Sample TLV Resonse:
+    Type    |Length |Value-err_code |...
+    0x40    |0x01   |0x00           |...
+    Type    |Length |Value-update_rate
+    0x45    |0x04   |active/stationary position update interval in multiples
+                    |of 100 milliseconds (2B each, little, unsigned)
+    ------------------------------------
+    :return: 
+        [act_upd_intval, sta_upd_intval, err_code] unit in milliseconds
+    """ 
+    TYPE, LENGTH, VALUE = b'\x04', b'\x00', b''
+    output_bytes = TYPE + LENGTH + VALUE
 
-    SHOW_OPE_INFO(t.portstr,TYPE,LENGTH)
+    t.reset_output_buffer()
+    t.reset_input_buffer()
+    t.write(output_bytes)
+    if verbose:
+        verbose_request(output_bytes)
+    TLV_response = t.read(9)
+    err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 1
+    if verbose:
+        verbose_response(TLV_response, err_code)
+    
+    # Parsing the returned TLV value
+    _upd_idx_pos = [5, 7]
+    act_upd_intval, sta_upd_intval = [float("nan")] * 2
+    [act_upd_intval, sta_upd_intval] = [
+        100 * int.from_bytes(upd_bytes, byteorder='little', signed=False) 
+        for upd_bytes in [TLV_response[idx:idx+2] for idx in _upd_idx_pos]
+        ]
+    
+    return [act_upd_intval, sta_upd_intval, err_code]
 
-    time.sleep(1)
-    num=t.inWaiting()
-    print("num",num)
-    if num:
-        str = t.read(num)
-        serial.Serial.close(t)
-        hexvalue=hex_in_string(str)   
 
-#################################
-#######################----------
 def dwm_cfg_tag_set(tag,t):
 
     TYPE=b'\x07'
