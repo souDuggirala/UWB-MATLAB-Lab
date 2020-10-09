@@ -2,3 +2,4 @@
 *.asv
 UWB-Experiments-MATLAB/.DS_Store
 *.pyc
+UWB-Experiments-MATLAB/MQTT_Communication_Scripts/.vscode/settings.json

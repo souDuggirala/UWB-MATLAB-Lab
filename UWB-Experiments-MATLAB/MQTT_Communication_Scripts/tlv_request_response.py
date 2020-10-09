@@ -8,7 +8,7 @@ try:
 except:
     pass
 
-def hex_show(bytes_to_show):       
+def hex_in_string(bytes_to_show):       
     return ''.join('{:02x} '.format(letter) for letter in bytes_to_show)
 
 t = serial.Serial("COM9", baudrate=115200, timeout=3.0)
@@ -24,6 +24,6 @@ time.sleep(1)
 num=t.inWaiting()
 if num:
     str = t.read(num)
-    print(hex_show(str))
+    print(hex_in_string(str))
     
 serial.Serial.close(t)
