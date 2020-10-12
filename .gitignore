@@ -1,6 +1,6 @@
 .ipynb_checkpoints/
 *.asv
 UWB-Experiments-MATLAB/.DS_Store
-*.pyc
-UWB-Experiments-MATLAB/MQTT_Communication_Scripts/.vscode/settings.json
+UWB-Experiments-MATLAB/MQTT_Communication_Scripts/.vscode/*
+UWB-Experiments-MATLAB/MQTT_Communication_Scripts/__pycache__/*
 *.pyc

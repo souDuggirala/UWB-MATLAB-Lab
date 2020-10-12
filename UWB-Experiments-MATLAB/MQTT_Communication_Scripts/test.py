@@ -2,7 +2,7 @@ import DWM1001 as dwm
 import serial
 import time
 
-t = serial.Serial("COM9",baudrate=115200,timeout=3)
+t = serial.Serial("COM4",baudrate=115200,timeout=3)
 
 dwm.dwm_pos_set(t, [2,3,4], 100, verbose=True)
 [x, y, z, qual, err] = dwm.dwm_pos_get(t, verbose=True)
