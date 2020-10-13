@@ -24,6 +24,34 @@ SCALE_TO_100MS = {
         "min"   : 600,
         }
 
+def read_single_TLV_frame(port, cutoff_bytes=0):
+    if not cutoff_bytes:
+        _TL_header = port.read(2)
+        if _TL_header:
+            _frame_value = port.read(_TL_header[1])
+            return _TL_header + _frame_value
+        else:
+            return b''
+    else:
+        return port.read(cutoff_bytes)
+    
+def read_all_TLV(port, expecting=0, timeout=0.5):
+    if expecting:
+        TLV_frames = [read_single_TLV_frame(port) for n in range(expecting)]
+    else:
+        TLV_frames = []
+        _time_cnt = 0
+        while port.inWaiting() or _time_cnt < timeout:
+            if port.inWaiting():
+                TLV_frames.append(read_single_TLV_frame(port))
+                _time_cnt = 0
+            elif _time_cnt < timeout:
+                time.sleep(0.01)
+                _time_cnt += 0.01
+            else:
+                break
+    return TLV_frames
+
 def hex_in_string(bytes_to_show):
     """ Show hexadecimal in string format
     """
@@ -38,7 +66,7 @@ def verbose_response(TLV_bytes, err_code, func_name):
     if err_code == 0:
         print("[{}] Success".format(func_name))
     else:
-        print("[{}] Error; error code: {}, message: {}"
+        print("[{}] Error with error code: {}, message: {}"
         .format(func_name, err_code, ERROR_CLS[err_code]))
     
 def error_handler(TLV_response, err_code, func_name):
@@ -56,7 +84,7 @@ def error_handler(TLV_response, err_code, func_name):
 def dwm_pos_set(t, coords, qual_fact_percent, unit="mm", verbose=False):
     """ API Section 5.3.1
     API Sample TLV Request:
-    Type    |Length |Value-position
+    Type    |Length |Value-position (13B)
     0x01    |0x0D   |x (4B, little), y (4B, little), z (4B, little), 
                     |percentage quality factor (1B)
 
@@ -92,7 +120,9 @@ def dwm_pos_set(t, coords, qual_fact_percent, unit="mm", verbose=False):
     t.write(output_bytes)
     if verbose:
         verbose_request(output_bytes)   
-    TLV_response = t.read(3)
+    
+    TLV_frames = read_all_TLV(t, expecting=1)
+    TLV_response = b''.join(TLV_frames)
     err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
@@ -111,7 +141,7 @@ def dwm_pos_get(t, verbose=False):
     API Sample TLV Resonse:
     Type    |Length |Value-err_code |...
     0x40    |0x01   |0x00           |...
-    Type    |Length |Value-position
+    Type    |Length |Value-position (13B)
     0x41    |0x0D   |x (4B, little), y (4B, little), z (4B, little), 
                     |percentage quality factor (1B)
     ------------------------------------
@@ -130,7 +160,8 @@ def dwm_pos_get(t, verbose=False):
     t.write(output_bytes)
     if verbose:
         verbose_request(output_bytes)
-    TLV_response = t.read(18)
+    TLV_frames = read_all_TLV(t, expecting=2)
+    TLV_response = b''.join(TLV_frames)
     err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
@@ -151,7 +182,7 @@ def dwm_pos_get(t, verbose=False):
 def dwm_upd_rate_set(t, act_upd_intval, sta_upd_intval, unit="100ms", verbose=False):
     """ API Section 5.3.3
     API Sample TLV Request:
-    Type    |Length |Value-update_rate
+    Type    |Length |Value-update_rate (4B)
     0x03    |0x04   |active/stationary position update interval in multiples
                     |of 100 milliseconds (2B each, little, unsigned)
 
@@ -190,7 +221,8 @@ def dwm_upd_rate_set(t, act_upd_intval, sta_upd_intval, unit="100ms", verbose=Fa
     t.write(output_bytes)
     if verbose:
         verbose_request(output_bytes)   
-    TLV_response = t.read(3)
+    TLV_frames = read_all_TLV(t, expecting=1)
+    TLV_response = b''.join(TLV_frames)
     err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
@@ -208,7 +240,7 @@ def dwm_upd_rate_get(t, verbose=False):
     API Sample TLV Resonse:
     Type    |Length |Value-err_code |...
     0x40    |0x01   |0x00           |...
-    Type    |Length |Value-update_rate
+    Type    |Length |Value-update_rate (4B)
     0x45    |0x04   |active/stationary position update interval in multiples
                     |of 100 milliseconds (2B each, little, unsigned)
     ------------------------------------
@@ -227,7 +259,8 @@ def dwm_upd_rate_get(t, verbose=False):
     t.write(output_bytes)
     if verbose:
         verbose_request(output_bytes)
-    TLV_response = t.read(9)
+    TLV_frames = read_all_TLV(t, expecting=2)
+    TLV_response = b''.join(TLV_frames)
     err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
@@ -257,7 +290,7 @@ def dwm_cfg_tag_set(t,
                     verbose=False):
     """ API Section 5.3.5
     API Sample TLV Request:
-    Type    |Length |Value-cfg_tag
+    Type    |Length |Value-cfg_tag (2B)
     0x05    |0x02   |16-bit integer, 2-byte, configuration of the tag
                     |(* BYTE 1 *)
                     |(bits 3-7) reserved
@@ -276,8 +309,8 @@ def dwm_cfg_tag_set(t,
     0x40    |0x01   |0x00
     ------------------------------------
     This API function configures the node as tag with given options.
-    BLE option can’t be enabled together with encryption otherwise the configuration is considered
-    invalid and it is refused. Encryption can’t be enabled if encryption key is not set.
+    BLE option can't be enabled together with encryption otherwise the configuration is considered
+    invalid and it is refused. Encryption can't be enabled if encryption key is not set.
     This call does a write to internal flash in case of new value being set, hence should not be used
     frequently as can take, in worst case, hundreds of milliseconds. Note that this function only sets the
     configuration parameters. To make effect of the settings, users should issue a reset command
@@ -291,7 +324,7 @@ def dwm_cfg_tag_set(t,
     TYPE, LENGTH, VALUE = b'\x05', b'\x02', b''
     
     if ble_en and enc_en:
-        raise ValueError("[{}]: Refused. BLE option can’t be enabled together \
+        raise ValueError("[{}]: Refused. BLE option can't be enabled together \
                           with encryption.".format(_func_name))
     cfg_tag_byte_1 = 0b00000000
     cfg_tag_byte_0 = 0b00000000
@@ -316,7 +349,8 @@ def dwm_cfg_tag_set(t,
     t.write(output_bytes)
     if verbose:
         verbose_request(output_bytes)   
-    TLV_response = t.read(3)
+    TLV_frames = read_all_TLV(t, expecting=1)
+    TLV_response = b''.join(TLV_frames)
     err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
@@ -337,7 +371,7 @@ def dwm_cfg_anchor_set( t,
                         verbose=False):
     """ API Section 5.3.6
     API Sample TLV Request:
-    Type    |Length |Value-cfg_anchor
+    Type    |Length |Value-cfg_anchor (2B)
     0x07    |0x02   |16-bit integer, 2-byte, configuration of the anchor
                     |(* BYTE 1 *)
                     |(bits 2-7) reserved
@@ -354,9 +388,9 @@ def dwm_cfg_anchor_set( t,
     Type    |Length |Value-err_code
     0x40    |0x01   |0x00
     ------------------------------------
-    Configure node as anchor with given options. BLE option can’t be enabled together with encryption
+    Configure node as anchor with given options. BLE option can't be enabled together with encryption
     otherwise the configuration is considered invalid and it is refused.
-    Encryption can’t be enabled if encryption key is not set. This call requires reset for new configuration
+    Encryption can't be enabled if encryption key is not set. This call requires reset for new configuration
     to take effect (dwm_reset). Enabling encryption on initiator will cause automatic enabling of
     encryption of all nodes that have the same encryption key set (dwm_enc_key_set). This allows to
     enable encryption for whole network that has the same pan ID (network ID) and the same
@@ -372,7 +406,7 @@ def dwm_cfg_anchor_set( t,
     TYPE, LENGTH, VALUE = b'\x07', b'\x02', b''
     
     if ble_en and enc_en:
-        raise ValueError("[{}]: Refused. BLE option can’t be enabled together \
+        raise ValueError("[{}]: Refused. BLE option can't be enabled together \
                           with encryption.".format(_func_name))
     cfg_anc_byte_1 = 0b00000000
     cfg_anc_byte_0 = 0b00000000
@@ -394,7 +428,8 @@ def dwm_cfg_anchor_set( t,
     t.write(output_bytes)
     if verbose:
         verbose_request(output_bytes)   
-    TLV_response = t.read(3)
+    TLV_frames = read_all_TLV(t, expecting=1)
+    TLV_response = b''.join(TLV_frames)
     err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
@@ -412,8 +447,8 @@ def dwm_cfg_get(t, verbose=False):
     API Sample TLV Resonse:
     Type    |Length |Value-err_code |...
     0x40    |0x01   |0x00           |...
-    Type    |Length |Value-cfg_node
-    0x45    |0x04   |16-bit integer, configuration of the node
+    Type    |Length |Value-cfg_node (2B)
+    0x46    |0x02   |16-bit integer, configuration of the node
                     |(* BYTE 1 *)
                     |(bit 5) mode : 0 - tag, 1 - anchor
                     |(bit 4) initiator
@@ -448,7 +483,8 @@ def dwm_cfg_get(t, verbose=False):
     cfg_node_byte_1 = 0b00000000
     cfg_node_byte_0 = 0b00000000
 
-    TLV_response = t.read(7)
+    TLV_frames = read_all_TLV(t, expecting=2)
+    TLV_response = b''.join(TLV_frames)
     err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
@@ -499,7 +535,8 @@ def dwm_sleep(t, verbose=False):
     if verbose:
         verbose_request(output_bytes)
     
-    TLV_response = t.read(3)
+    TLV_frames = read_all_TLV(t, expecting=1)
+    TLV_response = b''.join(TLV_frames)
     err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
@@ -520,15 +557,16 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
     API Sample TLV Resonse Example 1 (3 anchors):
     Type    |Length |Value-err_code |...
     0x40    |0x01   |0x00           |...
-    Type    |Length |Value              
-    0x56    |0x31   |uint8_t (1B)           |...
-                    |number of elements     |...
-                    |encoded in the value   |...
-                    |0x03                   |...
-    |uint16_t (2B)          |3×int32_t (12B)    |int8_t - RSSI (1B) |uint8_t - seat (1B)    |...
-    |UWB address in little  |position coords xyz|                   |                       |
-    |endian                 |in little endian   |                   |                       |
-    |-----------------------------------anchor nbr.1 (16B)----------------------------------|...anchor nr.2 anchor nr.3
+    Type    |Length |Value (1 + 16 * Anchors bytes).............................................           
+    0x56    |0x31   |uint8_t (1B)               |...
+                    |number of elements         |...
+                    |encoded in the value       |...
+                    |0x03                       |...
+    |Value (Cont.) .........................................................................|..................................
+    |uint16_t (2B)          |3×int32_t (12B)    |int8_t - RSSI (1B) |uint8_t - seat (1B)    |..................................
+    |UWB address in little  |position coords xyz|                   |                       |(Cont.) anchor nr.2 anchor nr.3...
+    |endian                 |in little endian   |                   |                       |..................................
+    |-----------------------------------anchor nbr.1 (16B)----------------------------------|..................................
 
     Sample (4 anchors):
     "40 01 00 56 41 04" 
@@ -559,6 +597,104 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
 
     _page_nbr = 0
     _anchor_bytes_nbr_by_page = []
+    # collect raw bytes and determine how many pages
+    while True:
+        _page_polling_bytes = TYPE + LENGTH + _page_nbr.to_bytes(1, byteorder="little", signed=False)
+        t.reset_output_buffer()
+        t.reset_input_buffer()
+        t.write(_page_polling_bytes)
+        TLV_frames = read_all_TLV(t, expecting=2)
+        _page_polling_response = TLV_frames[0]
+        err_code = _page_polling_response[2] if _page_polling_response[0:2] == b'\x40\x01' else 6
+        error_handler(_page_polling_response, err_code, _func_name)
+        anchor_nbr_in_this_page = TLV_frames[1][2]
+        if anchor_nbr_in_this_page != 0:
+            anchor_bytes = TLV_frames[1][3:]
+            if len(anchor_bytes) != anchor_nbr_in_this_page * 16:
+                raise ValueError("[{}]: Bytes for anchors do not match specs: 16 bits per anchor on page {}. Expecting {} anchors. Got {} Bytes."
+                                    .format(_func_name, _page_nbr, anchor_nbr_in_this_page, t.inWaiting()))
+            if verbose:
+                verbose_response(anchor_bytes, err_code, _func_name)
+            _anchor_bytes_nbr_by_page.append([anchor_bytes, anchor_nbr_in_this_page])
+        else:
+            break
+        _page_nbr += 1
+
+    # parse raw bytes into anchor hashmaps
+    anchors = []
+    for [B, nbr] in _anchor_bytes_nbr_by_page:
+        for i in range(nbr):
+            _anchor_i = {}
+            _anchor_i['addr'] = "{0:0{1}X}"\
+                            .format(int.from_bytes(B[i*16 + 0:i*16 + 2],        byteorder='little', signed=False), 4)
+            _anchor_i['x'] =        int.from_bytes(B[i*16 + 2  :i*16 + 6],      byteorder='little', signed=True)
+            _anchor_i['y'] =        int.from_bytes(B[i*16 + 6  :i*16 + 10],     byteorder='little', signed=True)
+            _anchor_i['z'] =        int.from_bytes(B[i*16 + 10 :i*16 + 14],     byteorder='little', signed=True)
+            _anchor_i['RSSI'] = B[i*16 + 14]
+            _anchor_i['seat'] = B[i*16 + 15]
+            anchors.append(_anchor_i)
+
+    return [anchors, err_code]
+
+
+def dwm_loc_get(t, verbose=False):
+    """ API Section 5.3.10, modified by Zezhou Wang
+    API Sample TLV Request:
+    Type    |Length 
+    0x0C    |0x00   
+    
+    API Sample TLV Resonse Example 2 (Anchor node):
+    Type    |Length |Value-err_code |...
+    0x40    |0x01   |0x00           |...
+    Type    |Length |Value-position (13B)                               |...    
+    0x41    |0x0D   |x (4B, little), y (4B, little), z (4B, little),    |...
+            |       |percentage quality factor (1B)                     |...
+    Type    |Length |Value-Number of anchors w. distances (1B) .............    
+    0x48    |0xC4   |0x0F                                               |...
+    |Value (cont.) .............................................................|..................................
+    |UWB address (8B)       |distance_to (4B)   |distance quality factoir (1B)  |..................................
+    |-----------------------distance to anchor nbr.1 (13B)----------------------|(Cont.) anchor nr.2 anchor nr.3...
+
+
+
+    
+    
+    |uint16_t (2B)          |3×int32_t (12B)    |int8_t - RSSI (1B) |uint8_t - seat (1B)    |...
+    |UWB address in little  |position coords xyz|                   |                       |
+    |endian                 |in little endian   |                   |                       |
+    |-----------------------------------anchor nbr.1 (16B)----------------------------------|...anchor nr.2 anchor nr.3
+
+    Sample (4 anchors):
+    "40 01 00 56 41 04" 
+    "84 c5 (Addr)| 3c 05 00 00 (x) | da 07 00 00 (y) | f4 0b 00 00 (z) | b2 (RSSI) | 00 (seat)" 
+    "0c 0c (Addr)| dc 05 00 00 (x) | c4 09 00 00 (y) | b8 0b 00 00 (z) | b2 (RSSI) | 01 (seat)" 
+    "28 13 (Addr)| 18 06 00 00 (x) | ce 04 00 00 (y) | 52 0d 00 00 (z) | b3 (RSSI) | 02 (seat)" 
+    "1c 9a (Addr)| 00 fa 00 00 (x) | 50 c3 00 00 (y) | 50 46 00 00 (z) | 81 (RSSI) | 04 (seat)"
+
+    API Sample TLV Resonse Example 2 (no anchor):
+    Type    |Length |Value-err_code
+    0x40    |0x01   |0x00          
+    Type    |Length |Value              
+    0x56    |0x01   |uint8_t -              
+                    |number of elements     
+                    |encoded in the value   
+                    |0x0F                   
+
+    ------------------------------------
+    Get last distances to the anchors (tag is currently ranging to) and the associated position. The
+    interrupt is triggered when all TWR measurements have completed and the LE has finished. If the LE
+    is disabled, the distances will just be returned. This API works the same way in both Responsive and
+    Low-Power tag modes. 
+    ------------------------------------
+    :return:
+        list of hash maps (key-value pairs for anchors), length unit in millimeter
+    """
+    _func_name = inspect.stack()[0][3]
+    TYPE, LENGTH, VALUE = b'\x0C', b'\x00', b''
+
+    _page_nbr = 0
+    _anchor_bytes_nbr_by_page = []
+    # collect raw bytes and determine how many pages
     while True:
         _page_polling_bytes = TYPE + LENGTH + _page_nbr.to_bytes(1, byteorder="little", signed=False)
         t.reset_output_buffer()
@@ -588,6 +724,7 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
             _anchor_bytes_nbr_by_page.append([anchor_bytes, anchor_nbr_in_this_page])
         _page_nbr += 1
 
+    # parse raw bytes into anchor hashmaps
     anchors = []
     for [B, nbr] in _anchor_bytes_nbr_by_page:
         for i in range(nbr):
@@ -601,10 +738,6 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
             _anchor_i['seat'] = B[i*16 + 15]
             anchors.append(_anchor_i)
 
-    return [anchors, err_code]
-
-
-def dwm_loc_get():
     return -1
 
 def dwm_baddr_set():
