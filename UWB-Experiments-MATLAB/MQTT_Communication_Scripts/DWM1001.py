@@ -565,6 +565,8 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
         t.reset_input_buffer()
         t.write(_page_polling_bytes)
         _page_polling_response = t.read(6)
+        err_code = _page_polling_response[2] if _page_polling_response[0:2] == b'\x40\x01' else 6
+        error_handler(_page_polling_response, err_code, _func_name)
         anchor_nbr_in_this_page = _page_polling_response[-1]
         if anchor_nbr_in_this_page == 0:
             break
@@ -581,6 +583,8 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
                                     per anchor on page {}. Expecting {} anchors. Got {} Bytes."
                                     .format(_func_name, _page_nbr, anchor_nbr_in_this_page, t.inWaiting()))
             anchor_bytes = t.read(t.inWaiting())
+            if verbose:
+                verbose_response(anchor_bytes, err_code, _func_name)
             _anchor_bytes_nbr_by_page.append([anchor_bytes, anchor_nbr_in_this_page])
         _page_nbr += 1
 
@@ -597,7 +601,7 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
             _anchor_i['seat'] = B[i*16 + 15]
             anchors.append(_anchor_i)
 
-    return anchors
+    return [anchors, err_code]
 
 
 def dwm_loc_get():
