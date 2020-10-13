@@ -481,8 +481,8 @@ def dwm_sleep(t, verbose=False):
     Type    |Length
     0x0A    |0x00  
     API Sample TLV Resonse:
-    Type    |Length |Value-err_code
-    0x40    |0x01   |0x00
+    Type    |Length |Value-err_code 
+    0x40    |0x01   |0x00           
     ------------------------------------
     This API function puts the module into sleep mode. Low power option must be enabled otherwise an
     error will be returned.
@@ -508,8 +508,97 @@ def dwm_sleep(t, verbose=False):
     return err_code
 
 
-def dwm_anchor_list_get():
-    return -1
+def dwm_anchor_list_get(t, verbose=False, timeout=5):
+    """ API Section 5.3.9, modified by Zezhou Wang
+    API Sample TLV Request:
+    Type    |Length |Value
+    0x0B    |0x01   |page_number
+
+    page_number: when the returned values become greater than 253 Bytes (maximum TLV length), 
+    it will separate into extra pages.
+    
+    API Sample TLV Resonse Example 1 (3 anchors):
+    Type    |Length |Value-err_code |...
+    0x40    |0x01   |0x00           |...
+    Type    |Length |Value              
+    0x56    |0x31   |uint8_t (1B)           |...
+                    |number of elements     |...
+                    |encoded in the value   |...
+                    |0x03                   |...
+    |uint16_t (2B)          |3×int32_t (12B)    |int8_t - RSSI (1B) |uint8_t - seat (1B)    |...
+    |UWB address in little  |position coords xyz|                   |                       |
+    |endian                 |in little endian   |                   |                       |
+    |-----------------------------------anchor nbr.1 (16B)----------------------------------|...anchor nr.2 anchor nr.3
+
+    Sample (4 anchors):
+    "40 01 00 56 41 04" 
+    "84 c5 (Addr)| 3c 05 00 00 (x) | da 07 00 00 (y) | f4 0b 00 00 (z) | b2 (RSSI) | 00 (seat)" 
+    "0c 0c (Addr)| dc 05 00 00 (x) | c4 09 00 00 (y) | b8 0b 00 00 (z) | b2 (RSSI) | 01 (seat)" 
+    "28 13 (Addr)| 18 06 00 00 (x) | ce 04 00 00 (y) | 52 0d 00 00 (z) | b3 (RSSI) | 02 (seat)" 
+    "1c 9a (Addr)| 00 fa 00 00 (x) | 50 c3 00 00 (y) | 50 46 00 00 (z) | 81 (RSSI) | 04 (seat)"
+
+    API Sample TLV Resonse Example 2 (no anchor):
+    Type    |Length |Value-err_code
+    0x40    |0x01   |0x00          
+    Type    |Length |Value              
+    0x56    |0x01   |uint8_t -              
+                    |number of elements     
+                    |encoded in the value   
+                    |0x0F                   
+
+    ------------------------------------
+    This API function reads list of surrounding anchors. Works for anchors only. Anchors in the list can be
+    from the same network or from the neighbor network as well.
+    Requesting page number that ain't exist will make the device frozen. Power-off and restart is needed. 
+    ------------------------------------
+    :return:
+        list of hash maps (key-value pairs for anchors), length unit in millimeter
+    """
+    _func_name = inspect.stack()[0][3]
+    TYPE, LENGTH, VALUE = b'\x0B', b'\x01', b''
+
+    _page_nbr = 0
+    _anchor_bytes_nbr_by_page = []
+    while True:
+        _page_polling_bytes = TYPE + LENGTH + _page_nbr.to_bytes(1, byteorder="little", signed=False)
+        t.reset_output_buffer()
+        t.reset_input_buffer()
+        t.write(_page_polling_bytes)
+        _page_polling_response = t.read(6)
+        anchor_nbr_in_this_page = _page_polling_response[-1]
+        if anchor_nbr_in_this_page == 0:
+            break
+        else:
+            _time_cnt = 0
+            while t.inWaiting() < 16 * anchor_nbr_in_this_page and _time_cnt < timeout:
+                time.sleep(0.01)
+                _time_cnt += 0.01
+            if _time_cnt > timeout:
+                raise TimeoutError("[{}]: Reading anchors timeout on page {}."
+                                    .format(_func_name, _page_nbr))
+            if t.inWaiting() != 16 * anchor_nbr_in_this_page:
+                raise ValueError("[{}]: Bytes for anchors do not match specs: 16 bits \
+                                    per anchor on page {}. Expecting {} anchors. Got {} Bytes."
+                                    .format(_func_name, _page_nbr, anchor_nbr_in_this_page, t.inWaiting()))
+            anchor_bytes = t.read(t.inWaiting())
+            _anchor_bytes_nbr_by_page.append([anchor_bytes, anchor_nbr_in_this_page])
+        _page_nbr += 1
+
+    anchors = []
+    for [B, nbr] in _anchor_bytes_nbr_by_page:
+        for i in range(nbr):
+            _anchor_i = {}
+            _anchor_i['addr'] = "{0:0{1}X}"\
+                            .format(int.from_bytes(B[i*16 + 0:i*16 + 2],        byteorder='little', signed=False), 4)
+            _anchor_i['x'] =        int.from_bytes(B[i*16 + 2  :i*16 + 6],      byteorder='little', signed=True)
+            _anchor_i['y'] =        int.from_bytes(B[i*16 + 6  :i*16 + 10],     byteorder='little', signed=True)
+            _anchor_i['z'] =        int.from_bytes(B[i*16 + 10 :i*16 + 14],     byteorder='little', signed=True)
+            _anchor_i['RSSI'] = B[i*16 + 14]
+            _anchor_i['seat'] = B[i*16 + 15]
+            anchors.append(_anchor_i)
+
+    return anchors
+
 
 def dwm_loc_get():
     return -1
