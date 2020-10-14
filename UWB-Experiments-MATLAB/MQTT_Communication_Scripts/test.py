@@ -20,3 +20,8 @@ print([a,b])
 # [print(n) for n in [pos, anchors, node_mode]]
 
 print(dwm.dwm_baddr_get(t, verbose=True))
+print(dwm.dwm_stnry_cfg_set(t, stnry_sensitivity=0, verbose=True))
+print(dwm.dwm_stnry_cfg_get(t, verbose=True))
+print(dwm.dwm_ver_get(t, verbose=True))
+print(dwm.dwm_status_get(t, verbose=True))
+print(dwm.dwm_int_cfg_get(t, verbose=True))
