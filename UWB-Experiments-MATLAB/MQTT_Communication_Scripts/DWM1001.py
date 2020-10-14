@@ -98,7 +98,7 @@ def dwm_pos_set(t, coords, qual_fact_percent, unit="mm", verbose=False):
     should not be used frequently as can take, in worst case, hundreds of milliseconds.
     ------------------------------------
     :return: 
-        error_code
+        [error_code]
     """ 
     _func_name = inspect.stack()[0][3]
     if unit not in ("mm", "cm", "m"):
@@ -128,7 +128,7 @@ def dwm_pos_set(t, coords, qual_fact_percent, unit="mm", verbose=False):
     error_handler(TLV_response, err_code, _func_name)
     # Parsing the returned TLV value
     # do nothing
-    return err_code
+    return [err_code]
 
 
 def dwm_pos_get(t, verbose=False):
@@ -195,7 +195,7 @@ def dwm_upd_rate_set(t, act_upd_intval, sta_upd_intval, unit="100ms", verbose=Fa
     take, in worst case, hundreds of milliseconds.
     ------------------------------------
     :return: 
-        error_code
+        [error_code]
     """ 
     _func_name = inspect.stack()[0][3]
     if unit not in ("100ms", "s", "min"):
@@ -228,7 +228,7 @@ def dwm_upd_rate_set(t, act_upd_intval, sta_upd_intval, unit="100ms", verbose=Fa
     error_handler(TLV_response, err_code, _func_name)
     # Parsing the returned TLV value
     # do nothing
-    return err_code
+    return [err_code]
 
 def dwm_upd_rate_get(t, verbose=False):
     """ API Section 5.3.4
@@ -315,7 +315,7 @@ def dwm_cfg_tag_set(t,
     (dwm_reset()), see section 5.3.13 for more detail.
     ------------------------------------
     :return: 
-        error_code
+        [error_code]
     """ 
     _func_name = inspect.stack()[0][3]
     TYPE, LENGTH, VALUE = b'\x05', b'\x02', b''
@@ -354,7 +354,7 @@ def dwm_cfg_tag_set(t,
     error_handler(TLV_response, err_code, _func_name)
     # Parsing the returned TLV value
     # do nothing
-    return err_code
+    return [err_code]
     
 
 def dwm_cfg_anchor_set( t, 
@@ -396,7 +396,7 @@ def dwm_cfg_anchor_set( t,
     frequently and can take in worst case hundreds of milliseconds.
     ------------------------------------
     :return: 
-        error_code
+        [error_code]
     """ 
     _func_name = inspect.stack()[0][3]
     TYPE, LENGTH, VALUE = b'\x07', b'\x02', b''
@@ -404,6 +404,7 @@ def dwm_cfg_anchor_set( t,
     if ble_en and enc_en:
         raise ValueError("[{}]: Refused. BLE option can't be enabled together \
                           with encryption.".format(_func_name))
+    
     cfg_anc_byte_1 = 0b00000000
     cfg_anc_byte_0 = 0b00000000
 
@@ -432,7 +433,7 @@ def dwm_cfg_anchor_set( t,
     error_handler(TLV_response, err_code, _func_name)
     # Parsing the returned TLV value
     # do nothing
-    return err_code
+    return [err_code]
 
 def dwm_cfg_get(t, verbose=False):
     """ API Section 5.3.7
@@ -475,9 +476,6 @@ def dwm_cfg_get(t, verbose=False):
     t.write(output_bytes)
     if verbose:
         verbose_request(output_bytes)
-    
-    cfg_node_byte_1 = 0b00000000
-    cfg_node_byte_0 = 0b00000000
 
     TLV_frames = read_all_TLV(t, expecting=2)
     TLV_response = b''.join(TLV_frames)
@@ -538,7 +536,7 @@ def dwm_sleep(t, verbose=False):
         verbose_response(TLV_response, err_code, _func_name)
     error_handler(TLV_response, err_code, _func_name)
     
-    return err_code
+    return [err_code]
 
 
 def dwm_anchor_list_get(t, verbose=False, timeout=5):
@@ -700,7 +698,7 @@ def dwm_loc_get(t, verbose=False):
     Low-Power tag modes. 
     ------------------------------------
     :return:
-        [pos, anchors, node_mode]
+        [pos, anchors, node_mode, error_code]
     """
     _func_name = inspect.stack()[0][3]
     TYPE, LENGTH, VALUE = b'\x0C', b'\x00', b''
@@ -757,7 +755,7 @@ def dwm_loc_get(t, verbose=False):
         if len(anchor_bytes) == anchor_nbr * 13:
             for i in range(anchor_nbr):
                 _anchor_i = {}
-                _anchor_i['addr'] = "{0:0{8}X}"\
+                _anchor_i['addr'] = "{0:0{1}X}"\
                                 .format(int.from_bytes(anchor_bytes[i*13 + 0  :i*13 + 8],   byteorder='little', signed=False), 8)
                 _anchor_i['dist_to'] =  int.from_bytes(anchor_bytes[i*13 + 8  :i*13 + 12],   byteorder='little', signed=False)
                 _anchor_i['qual'] =     anchor_bytes[12]
@@ -766,7 +764,7 @@ def dwm_loc_get(t, verbose=False):
             raise ValueError("[{}] (Mode in {}): Bytes for anchors do not match specs: 13 bits per anchor. Expecting {} anchors. Got {} Bytes."
                                     .format(_func_name, "tag" if is_tag else "anchor", anchor_nbr, len(anchor_bytes)))
     
-    return [pos, anchors, node_mode]
+    return [pos, anchors, node_mode, err_code]
 
 def dwm_baddr_set(t, ble_addr, verbose=False):
     """ API Section 5.3.11
@@ -783,7 +781,7 @@ def dwm_baddr_set(t, ble_addr, verbose=False):
     take, in worst case, hundreds of milliseconds.
     ------------------------------------
     :return: 
-        error_code
+        [error_code]
     """
     _func_name = inspect.stack()[0][3]
     TYPE, LENGTH, VALUE = b'\x0F', b'\x06', b''
@@ -809,10 +807,48 @@ def dwm_baddr_set(t, ble_addr, verbose=False):
     error_handler(TLV_response, err_code, _func_name)
     # Parsing the returned TLV value
     # do nothing
-    return err_code
+    return [err_code]
 
-def dwm_baddr_get():
-    return -1
+def dwm_baddr_get(t, verbose=False):
+    """ API Section 5.3.12
+    API Sample TLV Request:
+    Type    |Length 
+    0x10    |0x00   
+    
+    API Sample TLV Resonse:
+    Type    |Length |Value-err_code |...
+    0x40    |0x01   |0x00           |...
+    Type    |Length |Value-ble_addr (6B in little endian)
+    0x5F    |0x06   |0x01 0x23 0x45 0x67 0x89 0xab
+    ------------------------------------
+    Sets the public Bluetooth address used by device. New address takes effect after reset. This call does
+    a write to internal flash in case of new value being set, hence should not be used frequently as can
+    take, in worst case, hundreds of milliseconds.
+    ------------------------------------
+    :return: 
+        [BLE Address, error_code]
+    """
+    _func_name = inspect.stack()[0][3]
+    TYPE, LENGTH, VALUE = b'\x10', b'\x00', b''
+    
+    output_bytes = TYPE + LENGTH + VALUE
+
+    t.reset_output_buffer()
+    t.reset_input_buffer()
+    t.write(output_bytes)
+    if verbose:
+        verbose_request(output_bytes)
+    TLV_frames = read_all_TLV(t, expecting=2)
+    TLV_response = b''.join(TLV_frames)
+    err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
+    if verbose:
+        verbose_response(TLV_response, err_code, _func_name)
+    error_handler(TLV_response, err_code, _func_name)
+    
+    # Parsing the returned TLV value
+    ble_addr_bytes = TLV_frames[1][-6:]
+    ble_addr = "{0:0{1}X}".format(int.from_bytes(ble_addr_bytes, byteorder='little', signed=False), 6)
+    return [ble_addr, err_code]
 
 def dwm_stnry_cfg_set():
     return -1
