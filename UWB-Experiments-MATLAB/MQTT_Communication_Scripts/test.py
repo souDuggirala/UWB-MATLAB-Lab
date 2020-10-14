@@ -15,3 +15,6 @@ print([a,b])
 
 [pos, anchors, node_mode] = dwm.dwm_loc_get(t, verbose=True)
 [print(n) for n in [pos, anchors, node_mode]]
+
+dwm.dwm_baddr_set(t, "E6FCB689AD01", verbose=True)
+[print(n) for n in [pos, anchors, node_mode]]

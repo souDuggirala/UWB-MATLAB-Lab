@@ -768,8 +768,48 @@ def dwm_loc_get(t, verbose=False):
     
     return [pos, anchors, node_mode]
 
-def dwm_baddr_set():
-    return -1
+def dwm_baddr_set(t, ble_addr, verbose=False):
+    """ API Section 5.3.11
+    API Sample TLV Request:
+    Type    |Length |Value-ble_addr (6B in little endian)
+    0x0F    |0x06   |0x01 0x23 0x45 0x67 0x89 0xab
+    
+    API Sample TLV Resonse:
+    Type    |Length |Value-err_code 
+    0x40    |0x01   |0x00           
+    ------------------------------------
+    Sets the public Bluetooth address used by device. New address takes effect after reset. This call does
+    a write to internal flash in case of new value being set, hence should not be used frequently as can
+    take, in worst case, hundreds of milliseconds.
+    ------------------------------------
+    :return: 
+        error_code
+    """
+    _func_name = inspect.stack()[0][3]
+    TYPE, LENGTH, VALUE = b'\x0F', b'\x06', b''
+    
+    ble_addr_bytes = bytearray.fromhex(ble_addr)
+    ble_addr_bytes.reverse()
+    # Convert to little endian
+
+    VALUE = ble_addr_bytes
+    output_bytes = TYPE + LENGTH + VALUE
+    
+    t.reset_output_buffer()
+    t.reset_input_buffer()
+    t.write(output_bytes)
+    if verbose:
+        verbose_request(output_bytes)   
+    
+    TLV_frames = read_all_TLV(t, expecting=1)
+    TLV_response = b''.join(TLV_frames)
+    err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
+    if verbose:
+        verbose_response(TLV_response, err_code, _func_name)
+    error_handler(TLV_response, err_code, _func_name)
+    # Parsing the returned TLV value
+    # do nothing
+    return err_code
 
 def dwm_baddr_get():
     return -1
