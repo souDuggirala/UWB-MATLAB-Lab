@@ -103,7 +103,6 @@ def dwm_pos_set(t, coords, qual_fact_percent, unit="mm", verbose=False):
     _func_name = inspect.stack()[0][3]
     if unit not in ("mm", "cm", "m"):
         raise ValueError("[{}]: Invalid input unit".format(_func_name))
-    
     TYPE, LENGTH, VALUE = b'\x01', b'\x0D', b''
     
     [x, y, z] = [c * SCALE_TO_MM[unit] for c in coords]
@@ -250,7 +249,6 @@ def dwm_upd_rate_get(t, verbose=False):
         [act_upd_intval, sta_upd_intval, err_code] unit in milliseconds
     """ 
     _func_name = inspect.stack()[0][3]
-
     TYPE, LENGTH, VALUE = b'\x04', b'\x00', b''
     output_bytes = TYPE + LENGTH + VALUE
 
@@ -320,7 +318,6 @@ def dwm_cfg_tag_set(t,
         error_code
     """ 
     _func_name = inspect.stack()[0][3]
-    
     TYPE, LENGTH, VALUE = b'\x05', b'\x02', b''
     
     if ble_en and enc_en:
@@ -402,7 +399,6 @@ def dwm_cfg_anchor_set( t,
         error_code
     """ 
     _func_name = inspect.stack()[0][3]
-    
     TYPE, LENGTH, VALUE = b'\x07', b'\x02', b''
     
     if ble_en and enc_en:
@@ -597,7 +593,8 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
 
     _page_nbr = 0
     _anchor_bytes_nbr_by_page = []
-    # collect raw bytes and determine how many pages
+    # while loop used for determining how many pages are there.
+    # if polling a page number that doesn't exist, the device crashes.
     while True:
         _page_polling_bytes = TYPE + LENGTH + _page_nbr.to_bytes(1, byteorder="little", signed=False)
         t.reset_output_buffer()
@@ -620,7 +617,7 @@ def dwm_anchor_list_get(t, verbose=False, timeout=5):
             break
         _page_nbr += 1
 
-    # parse raw bytes into anchor hashmaps
+    # parse TLV frames into anchor hashmaps
     anchors = []
     for [B, nbr] in _anchor_bytes_nbr_by_page:
         for i in range(nbr):
@@ -643,6 +640,29 @@ def dwm_loc_get(t, verbose=False):
     Type    |Length 
     0x0C    |0x00   
     
+    API Sample TLV Resonse Example 1 (Tag node):
+    Type    |Length |Value-err_code |...
+    0x40    |0x01   |0x00           |...
+    Type    |Length |Value-position (13B)                               |...    
+    0x41    |0x0D   |x (4B, little), y (4B, little), z (4B, little),    |...
+            |       |percentage quality factor (1B)                     |...
+    Type    |Length |Value-Number of anchors w. distances (1B) .............    
+    0x49    |0x3d   |0x03                                               |...
+    |Value (cont.) (13 * Anchors bytes).................................................................|..........
+    |UWB address (2B)       |distance_to (4B)   |distance quality factoir (1B)  |anchor position (13B)  |..................................
+    |-----------------------------------distance to anchor nbr.1 (20B)----------------------------------|(Cont.) anchor nr.2 anchor nr.3...
+    
+    Sample (3 anchors used for tag ranging)
+    *Note*: the distance to anchor is not always non-zero.
+    "40 01 00"
+    "41 0d 9e 05 00 00 30 05 00 00 00 03 00 00 16" 
+    "49 3d 03 ... 
+    87 82 (Addr)| 32 01 00 00 (dist) | 64 (qual) | 78 05 00 00 (x) | 9a 06 00 00 (y) | e8 03 00 00 (z) | 64 (qual) AN1
+    28 13 (Addr)| 03 01 00 00 (dist) | 64 (qual) | e0 06 00 00 (x) | 1a 04 00 00 (y) | e8 03 00 00 (z) | 64 (qual) AN2
+    84 c5 (Addr)| 5e 02 00 00 (dist) | 64 (qual) | 74 04 00 00 (x) | fc 03 00 00 (y) | e8 03 00 00 (z) | 64 (qual) AN3
+    ------------|-----(another anchor could be here as ranging with 4 anchors simulatenously)----------|----------(AN4)
+
+    
     API Sample TLV Resonse Example 2 (Anchor node):
     Type    |Length |Value-err_code |...
     0x40    |0x01   |0x00           |...
@@ -651,21 +671,14 @@ def dwm_loc_get(t, verbose=False):
             |       |percentage quality factor (1B)                     |...
     Type    |Length |Value-Number of anchors w. distances (1B) .............    
     0x48    |0xC4   |0x0F                                               |...
-    |Value (cont.) .............................................................|..................................
+    |Value (cont.) (13 * Anchors bytes).........................................|..................................
     |UWB address (8B)       |distance_to (4B)   |distance quality factoir (1B)  |..................................
     |-----------------------distance to anchor nbr.1 (13B)----------------------|(Cont.) anchor nr.2 anchor nr.3...
 
 
-
-    
-    
-    |uint16_t (2B)          |3×int32_t (12B)    |int8_t - RSSI (1B) |uint8_t - seat (1B)    |...
-    |UWB address in little  |position coords xyz|                   |                       |
-    |endian                 |in little endian   |                   |                       |
-    |-----------------------------------anchor nbr.1 (16B)----------------------------------|...anchor nr.2 anchor nr.3
-
     Sample (4 anchors):
-    "40 01 00 56 41 04" 
+    "40 01 00"
+    "48 c4 0f ... 
     "84 c5 (Addr)| 3c 05 00 00 (x) | da 07 00 00 (y) | f4 0b 00 00 (z) | b2 (RSSI) | 00 (seat)" 
     "0c 0c (Addr)| dc 05 00 00 (x) | c4 09 00 00 (y) | b8 0b 00 00 (z) | b2 (RSSI) | 01 (seat)" 
     "28 13 (Addr)| 18 06 00 00 (x) | ce 04 00 00 (y) | 52 0d 00 00 (z) | b3 (RSSI) | 02 (seat)" 
@@ -687,58 +700,73 @@ def dwm_loc_get(t, verbose=False):
     Low-Power tag modes. 
     ------------------------------------
     :return:
-        list of hash maps (key-value pairs for anchors), length unit in millimeter
+        [pos, anchors, node_mode]
     """
     _func_name = inspect.stack()[0][3]
     TYPE, LENGTH, VALUE = b'\x0C', b'\x00', b''
+    output_bytes = TYPE + LENGTH + VALUE
+    
+    t.reset_output_buffer()
+    t.reset_input_buffer()
+    t.write(output_bytes)
+    if verbose:
+        verbose_request(output_bytes)
+    TLV_frames = read_all_TLV(t, expecting=3)
+    TLV_response = b''.join(TLV_frames)
+    err_code = TLV_response[2] if TLV_response[0:2] == b'\x40\x01' else 6
+    if verbose:
+        verbose_response(TLV_response, err_code, _func_name)
+    error_handler(TLV_response, err_code, _func_name)
 
-    _page_nbr = 0
-    _anchor_bytes_nbr_by_page = []
-    # collect raw bytes and determine how many pages
-    while True:
-        _page_polling_bytes = TYPE + LENGTH + _page_nbr.to_bytes(1, byteorder="little", signed=False)
-        t.reset_output_buffer()
-        t.reset_input_buffer()
-        t.write(_page_polling_bytes)
-        _page_polling_response = t.read(6)
-        err_code = _page_polling_response[2] if _page_polling_response[0:2] == b'\x40\x01' else 6
-        error_handler(_page_polling_response, err_code, _func_name)
-        anchor_nbr_in_this_page = _page_polling_response[-1]
-        if anchor_nbr_in_this_page == 0:
-            break
-        else:
-            _time_cnt = 0
-            while t.inWaiting() < 16 * anchor_nbr_in_this_page and _time_cnt < timeout:
-                time.sleep(0.01)
-                _time_cnt += 0.01
-            if _time_cnt > timeout:
-                raise TimeoutError("[{}]: Reading anchors timeout on page {}."
-                                    .format(_func_name, _page_nbr))
-            if t.inWaiting() != 16 * anchor_nbr_in_this_page:
-                raise ValueError("[{}]: Bytes for anchors do not match specs: 16 bits \
-                                    per anchor on page {}. Expecting {} anchors. Got {} Bytes."
-                                    .format(_func_name, _page_nbr, anchor_nbr_in_this_page, t.inWaiting()))
-            anchor_bytes = t.read(t.inWaiting())
-            if verbose:
-                verbose_response(anchor_bytes, err_code, _func_name)
-            _anchor_bytes_nbr_by_page.append([anchor_bytes, anchor_nbr_in_this_page])
-        _page_nbr += 1
+    # Parsing the returned TLV value
+    # node mode: 0x49/0d73 (Tag - 0) - Tag; 0x48/0d72 (Anchor - 1)
+    node_mode = abs(73 - TLV_frames[2][0])
+    is_tag = True if node_mode == 0 else False
 
-    # parse raw bytes into anchor hashmaps
+    pos = {}
+    pos_bytes = TLV_frames[1][2:]
+    _dim_idx_pos = [0, 4, 8]
+    pos['x'], pos['y'], pos['z'], pos['qual'] = [float("nan")] * 4
+    [pos['x'], pos['y'], pos['z']] = [
+        int.from_bytes(dim_bytes, byteorder='little', signed=True) 
+        for dim_bytes in [pos_bytes[idx:idx+4] for idx in _dim_idx_pos]
+        ]
+    pos['qual'] = pos_bytes[-1]
+    
     anchors = []
-    for [B, nbr] in _anchor_bytes_nbr_by_page:
-        for i in range(nbr):
-            _anchor_i = {}
-            _anchor_i['addr'] = "{0:0{1}X}"\
-                            .format(int.from_bytes(B[i*16 + 0:i*16 + 2],        byteorder='little', signed=False), 4)
-            _anchor_i['x'] =        int.from_bytes(B[i*16 + 2  :i*16 + 6],      byteorder='little', signed=True)
-            _anchor_i['y'] =        int.from_bytes(B[i*16 + 6  :i*16 + 10],     byteorder='little', signed=True)
-            _anchor_i['z'] =        int.from_bytes(B[i*16 + 10 :i*16 + 14],     byteorder='little', signed=True)
-            _anchor_i['RSSI'] = B[i*16 + 14]
-            _anchor_i['seat'] = B[i*16 + 15]
-            anchors.append(_anchor_i)
-
-    return -1
+    anchor_nbr = TLV_frames[2][2]
+    anchor_bytes = TLV_frames[2][3:]
+    if is_tag:
+        if len(anchor_bytes) == anchor_nbr * 20:
+            for i in range(anchor_nbr):
+                _anchor_i = {}
+                _anchor_i['addr'] = "{0:0{1}X}"\
+                                .format(int.from_bytes(anchor_bytes[i*20 + 0  :i*20 + 2],   byteorder='little', signed=False), 4)
+                _anchor_i['dist_to'] =  int.from_bytes(anchor_bytes[i*20 + 2  :i*20 + 6],   byteorder='little', signed=False)
+                _anchor_i['qual'] =     anchor_bytes[6]
+                _anchor_i['x'] =        int.from_bytes(anchor_bytes[i*20 + 7  :i*20 + 11],  byteorder='little', signed=True)
+                _anchor_i['y'] =        int.from_bytes(anchor_bytes[i*20 + 11 :i*20 + 15],  byteorder='little', signed=True)
+                _anchor_i['z'] =        int.from_bytes(anchor_bytes[i*20 + 15 :i*20 + 19],  byteorder='little', signed=True)
+                anchors.append(_anchor_i)
+        else:
+            raise ValueError("[{}] (Mode in {}): Bytes for anchors do not match specs: 20 bits per anchor. Expecting {} anchors. Got {} Bytes."
+                                    .format(_func_name, "tag" if is_tag else "anchor", anchor_nbr, len(anchor_bytes)))
+    else:
+        # It seems like the firmware has not implemented the following codes. 
+        # The returns are always zero
+        if len(anchor_bytes) == anchor_nbr * 13:
+            for i in range(anchor_nbr):
+                _anchor_i = {}
+                _anchor_i['addr'] = "{0:0{8}X}"\
+                                .format(int.from_bytes(anchor_bytes[i*13 + 0  :i*13 + 8],   byteorder='little', signed=False), 8)
+                _anchor_i['dist_to'] =  int.from_bytes(anchor_bytes[i*13 + 8  :i*13 + 12],   byteorder='little', signed=False)
+                _anchor_i['qual'] =     anchor_bytes[12]
+                anchors.append(_anchor_i)
+        else:
+            raise ValueError("[{}] (Mode in {}): Bytes for anchors do not match specs: 13 bits per anchor. Expecting {} anchors. Got {} Bytes."
+                                    .format(_func_name, "tag" if is_tag else "anchor", anchor_nbr, len(anchor_bytes)))
+    
+    return [pos, anchors, node_mode]
 
 def dwm_baddr_set():
     return -1
