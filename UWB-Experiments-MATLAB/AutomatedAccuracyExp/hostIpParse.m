@@ -3,7 +3,7 @@ function [hostIp, subnetMask] = hostIpParse()
     hostIp = strings;
     subnetMask = strings;
     if(ispc)
-        [stat, ipOut] = system('ipconfig');
+        [~, ipOut] = system('ipconfig');
         ipOutLines = splitlines(ipOut);
         for i=1:1:length(ipOutLines)
            if(contains(ipOutLines{i}, 'Wireless LAN adapter Wi-Fi:'))
@@ -29,7 +29,7 @@ function [hostIp, subnetMask] = hostIpParse()
         end
         
     elseif(ismac)
-        [stat, ipOut] = system('ifconfig');
+        [~, ipOut] = system('ifconfig');
         ipOutLines = splitlines(ipOut);
         for i=1:1:length(ipOutLines)
            if(contains(ipOutLines{i}, 'en0'))

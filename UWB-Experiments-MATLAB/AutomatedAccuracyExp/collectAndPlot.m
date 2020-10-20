@@ -48,7 +48,7 @@ function collectAndPlot()
                 WritePosFileUsingSerialPort(initialpos,positions,...
                     duration,waitTime,readerCheckTime,port,flag);
             elseif(strcmpi(modeOfDataCollection,"MQTT"))
-                [mqttObj, mysub] = tagMqttSubscriptionInit();
+                [mqttObj, mysub] = tagMqttSubscriptionInit(0);
                 cd (expName);
                 WritePosFileUsingMQTT(initialpos,positions,...
                     duration,waitTime,readerCheckTime,mqttObj,mysub,flag);
@@ -63,7 +63,9 @@ function collectAndPlot()
         end
         
         if(strcmpi(plotNow,"Y"))
-            GeoExp(x_anch_pos,y_anch_pos,x_true,y_true);
+            cd ..
+            GeoExp(x_anch_pos,y_anch_pos,x_true,y_true,expName);
+            cd(expName)
         end
         
         cd ..
@@ -297,25 +299,52 @@ function [xAnchor, yAnchor, zAnchor] = expAnchorGet(varargin)
 end
 
 
-function [mqttObj, mqttSub] = tagMqttSubscriptionInit()
-    fprintf("[MQTT/Wi-Fi Backbone] Scanning the IP for tags in WLAN...\n");
-    [hostIp, subnetMask] = hostIpParse();
-    fprintf("[MQTT/Wi-Fi Backbone] Host ip: " + hostIp + "; Subnet Mask: " + subnetMask + "\n");
-    [tagIp, tagMAC] = ipScan(hostIp, subnetMask);
-    fprintf("[MQTT/Wi-Fi Backbone] Using the first found tag as the experiment object..." + "\n");
-    fprintf("[MQTT/Wi-Fi Backbone] First tag ip found as: " + tagIp{1} + " MAC: " + tagMAC{1} + "\n");
-    ipaddress = string(tagIp{1});
-    tagId = input("Enter the tag ID :",'s');
-    tagId = string(tagId);
-    tagId = tagId.upper();
-    tcp = "tcp://";
-    tcp = tcp.append(ipaddress);
-    link = "Tag/";
-    link = link.append(tagId);
-    link = link.append("/Uplink/Location");
-    
-    mqttObj = mqtt(tcp); 
-    mqttSub = subscribe(mqttObj,link);
+function [mqttObj, mqttSub] = tagMqttSubscriptionInit(retry)
+    try
+        fprintf("[MQTT/Wi-Fi Backbone] Scanning the IP for tags in WLAN...\n");
+        [hostIp, subnetMask] = hostIpParse();
+        fprintf("[MQTT/Wi-Fi Backbone] Host ip: " + hostIp + "; Subnet Mask: " + subnetMask + "\n");
+        [tagIp, tagMAC] = ipScan(hostIp, subnetMask);
+        fprintf("[MQTT/Wi-Fi Backbone] Using the first found tag as the experiment object..." + "\n");
+
+        % No tag has been identified raising concern
+        if (length(tagIp) < 1)
+            ME = MException('myComponent:inputErrorTag', ...
+                 '[MQTT/Wi-Fi Backbone]No Tag found on WLAN');
+            beep;
+            throw(ME);  
+        end
+
+        fprintf("[MQTT/Wi-Fi Backbone] First tag ip found as: " + tagIp{1} + " MAC: " + tagMAC{1} + "\n");
+        ipaddress = string(tagIp{1});
+        tagId = input("Enter the tag ID :",'s');
+        tagId = string(tagId);
+        tagId = tagId.upper();
+        tcp = "tcp://";
+        tcp = tcp.append(ipaddress);
+        link = "Tag/";
+        link = link.append(tagId);
+        link = link.append("/Uplink/Location");
+
+        mqttObj = mqtt(tcp); 
+        mqttSub = subscribe(mqttObj,link);
+    catch ME
+        if(strcmp(ME.identifier,'myComponent:inputErrorTag'))
+            if (retry <= 3)
+                uiwait(msgbox('Please check the if tags are on same WLAN and Retry',...
+                'No Tag Found!!!!','warn'));
+                retry = retry+1;
+                fprintf("[MQTT/Wi-Fi Backbone] retry: %d \n", retry);
+                [mqttObj, mqttSub] = tagMqttSubscriptionInit(retry);
+            else
+                 uiwait(msgbox('Maximum retry for tag discovery reached',...
+                'No Tag Found!!!!','error'));
+                 error(ME)
+            end
+        else
+            rethrow(ME);
+        end  
+    end
 end
 
 
@@ -338,14 +367,14 @@ end
 
 
 function myCleanup()
-    global expName status
+    global expName scriptStatus
     fprintf('\n Close ALL \n');
     fclose("all");
     fprintf(expName + "\n");
-    fprintf(status + "\n");
+    fprintf(scriptStatus + "\n");
     disp(pwd)
     cd(expName);
-    if ~strcmp(status,"FT")
+    if ~strcmp(scriptStatus,"FT")
         delete("*.mat")
         delete("*.png")
     end

@@ -22,6 +22,13 @@ function [tagIp, tagMAC] = ipScan(hostIp, subnetMask)
         error('MATLAB runtime scanner on unix is not developped yet!')
     end
     
+    %nmap is not configured correctly terminating program with an error
+    if (stat ==1)
+        uiwait(msgbox('Please check nmap configuration either it is not installed or command path is not set',...
+        'nmap Error!!!!','error'));
+        error("nmap configuration error")
+    end
+    
     nmapOutLines = splitlines(nmapOut);
     trimmedNmapOut = nmapOutLines(2:end-2);
     try

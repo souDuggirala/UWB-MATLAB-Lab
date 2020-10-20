@@ -1,5 +1,5 @@
-function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true)
-    global expName;
+function GeoExp(x_anch_pos,y_anch_pos,x_true,y_true,expName)
+    cd(expName);
     %Getting coordinates of positions 
     method = input("Do you have actual coordinates of positions?(Y/N) ",'s');
     if(strcmpi(method,"Y"))
