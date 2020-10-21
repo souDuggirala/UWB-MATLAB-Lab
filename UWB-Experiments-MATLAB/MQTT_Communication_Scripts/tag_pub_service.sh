@@ -12,13 +12,13 @@ do
 		nohup python3 -u "/home/pi/${PROCESS_NAME}" >> /home/pi/tag_pub_out.log 2>&1 &
 	elif [ "${NUM}" -gt "1" ];then
 		echo "[\n\n${time} Daemon] multiple publisher processes killed all. Restarting..." >> /home/pi/tag_pub_out.log
-		killall -9 $PROCESS_NAME
+		pkill -f $PROCESS_NAME
 	fi
 	# kill the zombie process (STAT T)
 	NUM_STAT=`ps aux | grep ${PROCESS_NAME} | grep T | grep -v grep | wc -l`
 	if [ "${NUM_STAT}" -gt "1" ];then
 		echo "[\n\n${time} Daemon] zomebie publisher processes found. killed all. Restarting..." >> /home/pi/tag_pub_out.log
-		killall -9 $PROCESS_NAME
+		pkill -f $PROCESS_NAME
 	fi
 	sleep 5s
 done

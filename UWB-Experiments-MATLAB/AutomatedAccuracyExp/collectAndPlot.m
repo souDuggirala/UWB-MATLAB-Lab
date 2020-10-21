@@ -70,7 +70,7 @@ function collectAndPlot()
         
         cd ..
         movefile(expName,'../LabOutdoor/');
-        disp("Moved files to LabOutdoor directory for future plotting \n")
+        fprintf("Moved files to LabOutdoor directory for future plotting \n")
         
    catch ME
        fprintf("\n"+ME.identifier);
@@ -317,13 +317,10 @@ function [mqttObj, mqttSub] = tagMqttSubscriptionInit(retry)
 
         fprintf("[MQTT/Wi-Fi Backbone] First tag ip found as: " + tagIp{1} + " MAC: " + tagMAC{1} + "\n");
         ipaddress = string(tagIp{1});
-        tagId = input("Enter the tag ID :",'s');
-        tagId = string(tagId);
-        tagId = tagId.upper();
         tcp = "tcp://";
         tcp = tcp.append(ipaddress);
         link = "Tag/";
-        link = link.append(tagId);
+        link = link.append("+");
         link = link.append("/Uplink/Location");
 
         mqttObj = mqtt(tcp); 
@@ -373,8 +370,10 @@ function myCleanup()
     fprintf(expName + "\n");
     fprintf(scriptStatus + "\n");
     disp(pwd)
-    cd(expName);
     if ~strcmp(scriptStatus,"FT")
+        if ~contains(pwd,expName)
+            cd(expName); 
+        end
         delete("*.mat")
         delete("*.png")
     end
