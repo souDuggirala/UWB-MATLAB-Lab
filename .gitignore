@@ -5,3 +5,6 @@ UWB-Experiments-MATLAB/MQTT_Communication_Scripts/.vscode/*
 UWB-Experiments-MATLAB/MQTT_Communication_Scripts/__pycache__/*
 *.pyc
 UWB-Experiments-MATLAB/MQTT_Communication_Scripts/__pycache__/DWM1001.cpython-37.pyc
+*.pyo
+*.swp
+.DS_Store
