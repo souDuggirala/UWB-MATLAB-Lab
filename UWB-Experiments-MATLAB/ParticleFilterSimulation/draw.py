@@ -9,6 +9,7 @@
 import math
 import turtle
 import random
+import time
 
 turtle.tracer(50000, delay=0)
 turtle.register_shape("dot", ((-3,-3), (-3,3), (3,3), (3,-3)))
@@ -20,10 +21,10 @@ UPDATE_EVERY = 0
 DRAW_EVERY = 2
 
 class Maze(object):
-    def __init__(self, maze):
-        self.maze = maze
-        self.width   = len(maze[0])
-        self.height  = len(maze)
+    def __init__(self, maze_matrix):
+        self.maze = maze_matrix
+        self.width   = len(maze_matrix[0])
+        self.height  = len(maze_matrix)
         turtle.setworldcoordinates(0, 0, self.width, self.height)
         self.blocks = []
         self.update_cnt = 0
@@ -39,6 +40,7 @@ class Maze(object):
                         self.beacons.extend(((x, nb_y), (x+1, nb_y), (x, nb_y+1), (x+1, nb_y+1)))
 
     def draw(self):
+        # draw the blocks of the maze
         for x, y in self.blocks:
             turtle.up()
             turtle.setposition(x, y)
@@ -51,6 +53,7 @@ class Maze(object):
             turtle.end_fill()
             turtle.up()
 
+        # draw the beacons/anchors
         turtle.color("#00ffff")
         for x, y in self.beacons:
             turtle.setposition(x, y)
@@ -72,6 +75,9 @@ class Maze(object):
         yy = self.height - int(y) - 1
         xx = int(x)
         return self.maze[yy][xx] == 0
+        # 0 - empty square
+        # 1 - occupied square
+        # 2 - occupied square with a beacon at each corner, detectable by the robot
 
     def show_mean(self, x, y, confident=False):
         if confident:

@@ -139,8 +139,8 @@ class Particle(object):
         return self.x, self.y, self.h
 
     @classmethod
-    def create_random(cls, count, maze):
-        return [cls(*maze.random_free_place()) for _ in range(0, count)]
+    def create_random_particles(cls, particle_count, maze):
+        return [cls(*maze.random_free_place()) for _ in range(0, particle_count)]
 
     def read_sensor(self, maze):
         """
@@ -205,11 +205,14 @@ world = Maze(maze_data)
 world.draw()
 
 # initial distribution assigns each particle an equal probability
-particles = Particle.create_random(PARTICLE_COUNT, world)
+particles = Particle.create_random_particles(PARTICLE_COUNT, world)
 robbie = Robot(world)
 
 while True:
     # Read robbie's sensor
+    # Only one raning result from one anchor is used. 
+    # To expand the dimensions, use multiple anchors, then we have multiple readings
+    # for particles and adjust particle weights accordingly. 
     r_d = robbie.read_sensor(world)
 
     # Update particle weight according to how good every particle matches
@@ -244,7 +247,7 @@ while True:
     for _ in particles:
         p = dist.pick()
         if p is None:  # No pick b/c all totally improbable
-            new_particle = Particle.create_random(1, world)[0]
+            new_particle = Particle.create_random_particles(1, world)[0]
         else:
             new_particle = Particle(p.x, p.y,
                     heading=robbie.h if ROBOT_HAS_COMPASS else p.h,
