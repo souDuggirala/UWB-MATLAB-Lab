@@ -21,24 +21,24 @@ UPDATE_EVERY = 0
 DRAW_EVERY = 2
 
 class Maze(object):
-    def __init__(self, maze_matrix):
+    def __init__(self, maze_matrix, block_width=0.5):
         self.maze = maze_matrix
         self.width   = len(maze_matrix[0])
         self.height  = len(maze_matrix)
+        self.block_witdh = block_width
         turtle.setworldcoordinates(0, 0, self.width, self.height)
         self.blocks = []
         self.update_cnt = 0
         self.one_px = float(turtle.window_width()) / float(self.width) / 2
-
+        print(self.width, self.height)
         self.beacons = []
         for y, line in enumerate(self.maze):
             for x, block in enumerate(line):
                 if block:
-                    nb_y = self.height - y - 1
-                    self.blocks.append((x, nb_y))
+                    nb_y = self.height - y - self.block_witdh
+                    self.blocks.append((x, nb_y))   # lower-left corner of the block
                     if block == 2:
-                        self.beacons.extend(((x, nb_y), (x+1, nb_y), (x, nb_y+1), (x+1, nb_y+1)))
-
+                        self.beacons.append((x + self.block_witdh/2, nb_y + self.block_witdh/2))
     def draw(self):
         # draw the blocks of the maze
         for x, y in self.blocks:
@@ -48,7 +48,7 @@ class Maze(object):
             turtle.setheading(90)
             turtle.begin_fill()
             for _ in range(0, 4):
-                turtle.fd(1)
+                turtle.fd(self.block_witdh)
                 turtle.right(90)
             turtle.end_fill()
             turtle.up()
@@ -136,11 +136,10 @@ class Maze(object):
         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
     def distance_to_nearest_beacon(self, x, y):
-        d = 99999
+        d = float('inf')
         for c_x, c_y in self.beacons:
             distance = self.distance(c_x, c_y, x, y)
             if distance < d:
                 d = distance
                 d_x, d_y = c_x, c_y
-
         return d
