@@ -8,10 +8,13 @@
 
 from __future__ import absolute_import
 
+from typing import (Dict, List, Tuple, Set)
+
 import random
 import math
 import bisect
-
+import numpy as np
+from scipy.stats import multivariate_normal
 from draw import Maze
 
 """
@@ -39,7 +42,7 @@ maze_data = ( ( 2, 0, 1, 0, 0 ),
 #               ( 0, 0, 0, 0, 1, 0, 0, 0, 1, 0 ),
 #               ( 0, 0, 1, 0, 0, 2, 1, 1, 1, 0 ))
 
-maze_data = ( ( 2, 0, 0, 0, 0, 0, 0, 0, 0, 2 ),
+maze_data = ( ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
               ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
               ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
               ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
@@ -48,11 +51,11 @@ maze_data = ( ( 2, 0, 0, 0, 0, 0, 0, 0, 0, 2 ),
               ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
               ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
               ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 2, 0, 0, 0, 0, 0, 0, 0, 0, 2 ))
+              ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
 
 PARTICLE_COUNT = 2000    # Total number of particles
 
-ROBOT_HAS_COMPASS = True # Does the robot know where north is? If so, it
+ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
 # makes orientation a lot easier since it knows which direction it is facing.
 # If not -- and that is really fascinating -- the particle filter can work
 # out its heading too, it just takes more particles and more time. Try this
@@ -63,6 +66,8 @@ ROBOT_HAS_COMPASS = True # Does the robot know where north is? If so, it
 # Some utility functions
 
 def add_noise(level, *coords):
+    if isinstance(coords[0], list):
+        return [x + random.uniform(-level, level) for x in coords[0]]
     return [x + random.uniform(-level, level) for x in coords]
 
 def add_little_noise(*coords):
@@ -73,10 +78,25 @@ def add_some_noise(*coords):
 
 # This is just a gaussian kernel I pulled out of my hat, to transform
 # values near to robbie's measurement => 1, further away => 0
-sigma2 = 0.9 ** 2
+sigma = 0.9
+sigma2 = sigma ** 2
 def w_gauss(a, b):
     error = a - b
     g = math.e ** -(error ** 2 / (2 * sigma2))
+    return g
+
+# This is the 0-mean multivariate gaussian pdf value serves as the weight
+# values near to robbie's measurement => 1, further away => 0
+# the pdf value is not normalized
+def w_gauss_multi(a: List, b: List) -> float:
+    assert len(a) == len(b)
+    error = [a[i] - b[i] for i in range(len(a))]
+    mean = [0] * len(a)
+    cov = [ [sigma,0,0,0],
+            [0,sigma,0,0],
+            [0,0,sigma,0],
+            [0,0,0,sigma]]
+    g = multivariate_normal.pdf(x=error, mean=mean, cov=cov)
     return g
 
 # ------------------------------------------------------------------------
@@ -103,7 +123,7 @@ def compute_mean_point(particles):
     # actually are in the immediate vicinity
     m_count = 0
     for p in particles:
-        if world.distance(p.x, p.y, m_x, m_y) < 1:
+        if world.euclidean_dist(p.x, p.y, m_x, m_y) < 1:
             m_count += 1
 
     return m_x, m_y, m_count > PARTICLE_COUNT * 0.95
@@ -158,6 +178,12 @@ class Particle(object):
         Find distance to nearest beacon.
         """
         return maze.distance_to_nearest_beacon(*self.xy)
+    
+    def read_sensors(self, maze):
+        """
+        Find all distances to all available beacons.
+        """
+        return maze.distances_to_all_beacons(*self.xy)
 
     def advance_by(self, speed, checker=None, noisy=False):
         h = self.h
@@ -178,7 +204,7 @@ class Particle(object):
 
 # ------------------------------------------------------------------------
 class Robot(Particle):
-    speed = 0.2
+    speed = 0
 
     def __init__(self, maze):
         super(Robot, self).__init__(*maze.random_free_place(), heading=90)
@@ -196,6 +222,14 @@ class Robot(Particle):
         and is not very accurate at that too!
         """
         return add_little_noise(super(Robot, self).read_sensor(maze))[0]
+    
+    def read_sensors(self, maze):
+        """
+        Poor robot, it's sensors are noisy and pretty strange,
+        it only can measure the distance to the nearest beacon(!)
+        and is not very accurate at that too!
+        """
+        return add_little_noise(super(Robot, self).read_sensors(maze))
 
     def move(self, maze):
         """
@@ -211,69 +245,75 @@ class Robot(Particle):
             self.chose_random_direction()
 
 # ------------------------------------------------------------------------
+if __name__ == "__main__":
+    world = Maze(maze_data)
+    world.draw()
 
-world = Maze(maze_data)
-world.draw()
+    # initial distribution assigns each particle an equal probability
+    particles = Particle.create_random_particles(PARTICLE_COUNT, world)
+    robbie = Robot(world)
 
-# initial distribution assigns each particle an equal probability
-particles = Particle.create_random_particles(PARTICLE_COUNT, world)
-robbie = Robot(world)
-
-while True:
-    # Read robbie's sensor
-    # Only one raning result from one anchor is used. 
-    # To expand the dimensions, use multiple anchors, then we have multiple readings
-    # for particles and adjust particle weights accordingly. 
-    r_d = robbie.read_sensor(world)
-
-    # Update particle weight according to how good every particle matches
-    # robbie's sensor reading
-    for p in particles:
-        if world.is_free(*p.xy):
-            p_d = p.read_sensor(world)
-            p.w = w_gauss(r_d, p_d)
-        else:
-            p.w = 0
-
-    # ---------- Try to find current best estimate for display ----------
-    m_x, m_y, m_confident = compute_mean_point(particles)
-
-    # ---------- Show current state ----------
-    world.show_particles(particles)
-    world.show_mean(m_x, m_y, m_confident)
-    world.show_robot(robbie)
-
-    # ---------- Shuffle particles ----------
-    new_particles = []
-
-    # Normalise weights
-    nu = sum(p.w for p in particles)
-    if nu:
+    while True:
+        # Read robbie's sensor
+        # Only one raning result from one anchor is used. 
+        # To expand the dimensions, use multiple anchors, then we have multiple readings
+        # for particles and adjust particle weights accordingly. 
+        # Update particle weight according to how good every particle matches
+        # robbie's sensor reading
+        # r_d = robbie.read_sensor(world)
+        # for p in particles:
+        #     if world.is_free(*p.xy):
+        #         p_d = p.read_sensor(world)
+        #         p.w = w_gauss(r_d, p_d)
+        #     else:
+        #         p.w = 0
+        r_ds = robbie.read_sensors(world)
         for p in particles:
-            p.w = p.w / nu
+            if world.is_free(*p.xy):
+                p_ds = p.read_sensors(world)
+                p.w = w_gauss_multi(r_ds, p_ds)
+            else:
+                p.w = 0
 
-    # create a weighted distribution, for fast picking
-    dist = WeightedDistribution(particles)
+        # ---------- Try to find current best estimate for display ----------
+        m_x, m_y, m_confident = compute_mean_point(particles)
 
-    for _ in particles:
-        p = dist.pick()
-        if p is None:  # No pick b/c all totally improbable
-            new_particle = Particle.create_random_particles(1, world)[0]
-        else:
-            new_particle = Particle(p.x, p.y,
-                    heading=robbie.h if ROBOT_HAS_COMPASS else p.h,
-                    noisy=True)
-        new_particles.append(new_particle)
+        # ---------- Show current state ----------
+        world.show_particles(particles)
+        world.show_mean(m_x, m_y, m_confident)
+        world.show_robot(robbie)
 
-    particles = new_particles
+        # ---------- Shuffle particles ----------
+        new_particles = []
 
-    # ---------- Move things ----------
-    old_heading = robbie.h
-    robbie.move(world)
-    d_h = robbie.h - old_heading
+        # Normalise weights
+        nu = sum(p.w for p in particles)
+        if nu:
+            for p in particles:
+                p.w = p.w / nu
 
-    # Move particles according to my belief of movement (this may
-    # be different than the real movement, but it's all I got)
-    for p in particles:
-        p.h += d_h # in case robot changed heading, swirl particle heading too
-        p.advance_by(robbie.speed)
+        # create a weighted distribution, for fast picking
+        dist = WeightedDistribution(particles)
+
+        for _ in particles:
+            p = dist.pick()
+            if p is None:  # No pick b/c all totally improbable
+                new_particle = Particle.create_random_particles(1, world)[0]
+            else:
+                new_particle = Particle(p.x, p.y,
+                        heading=robbie.h if ROBOT_HAS_COMPASS else p.h,
+                        noisy=True)
+            new_particles.append(new_particle)
+
+        particles = new_particles
+
+        # ---------- Move things ----------
+        old_heading = robbie.h
+        robbie.move(world)
+        d_h = robbie.h - old_heading
+
+        # Move particles according to my belief of movement (this may
+        # be different than the real movement, but it's all I got)
+        for p in particles:
+            p.h += d_h # in case robot changed heading, swirl particle heading too
+            p.advance_by(robbie.speed)

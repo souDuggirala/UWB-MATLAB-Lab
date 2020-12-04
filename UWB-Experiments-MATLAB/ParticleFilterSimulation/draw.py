@@ -11,6 +11,8 @@ import turtle
 import random
 import time
 
+from typing import (Dict, List, Tuple, Set)
+
 turtle.tracer(50000, delay=0)
 turtle.register_shape("dot", ((-3,-3), (-3,3), (3,3), (3,-3)))
 turtle.register_shape("tri", ((-3, -2), (0, 3), (3, -2), (0, 0)))
@@ -30,15 +32,18 @@ class Maze(object):
         self.blocks = []
         self.update_cnt = 0
         self.one_px = float(turtle.window_width()) / float(self.width) / 2
-        print(self.width, self.height)
         self.beacons = []
         for y, line in enumerate(self.maze):
             for x, block in enumerate(line):
                 if block:
                     nb_y = self.height - y - self.block_witdh
-                    self.blocks.append((x, nb_y))   # lower-left corner of the block
-                    if block == 2:
+                    # (x, nb_y) is the lower-left corner of the block
+                    self.blocks.append((x, nb_y))
+                    if block == 2: # one at each corner
+                        self.beacons.extend(((x, nb_y), (x+1, nb_y), (x, nb_y+1), (x+1, nb_y+1)))
+                    if block == 3: # one at center only
                         self.beacons.append((x + self.block_witdh/2, nb_y + self.block_witdh/2))
+
     def draw(self):
         # draw the blocks of the maze
         for x, y in self.blocks:
@@ -75,9 +80,11 @@ class Maze(object):
         yy = self.height - int(y) - 1
         xx = int(x)
         return self.maze[yy][xx] == 0
+
         # 0 - empty square
         # 1 - occupied square
         # 2 - occupied square with a beacon at each corner, detectable by the robot
+        # 3 - occupied square with a beacon at the sensor, detectable by the robot
 
     def show_mean(self, x, y, confident=False):
         if confident:
@@ -132,14 +139,20 @@ class Maze(object):
             if self.is_free(x, y):
                 return x, y
 
-    def distance(self, x1, y1, x2, y2):
+    def euclidean_dist(self, x1, y1, x2, y2):
         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
     def distance_to_nearest_beacon(self, x, y):
         d = float('inf')
         for c_x, c_y in self.beacons:
-            distance = self.distance(c_x, c_y, x, y)
+            distance = self.euclidean_dist(c_x, c_y, x, y)
             if distance < d:
                 d = distance
                 d_x, d_y = c_x, c_y
         return d
+    
+    def distances_to_all_beacons(self, x, y) -> Tuple:
+        dist = []
+        for c_x, c_y in self.beacons:
+            dist.append(self.euclidean_dist(c_x, c_y, x, y))
+        return dist
