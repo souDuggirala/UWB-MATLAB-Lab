@@ -200,16 +200,7 @@ def make_json_dic(raw_string):
     return data
 
 
-def on_killed(signum, frame):
-        """ Closure function as handler to signal.signal in order to pass serialport name
-        """
-        # if killed by UNIX, no need to execute on_exit callback
-        atexit.unregister(on_exit)
-        sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(t.port))
-        t.close()
-
-
-def parse_uart_init(mqtt_broker, mqtt_port):
+def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
     # register the callback functions when the service ends
     # atexit for regular exit, signal.signal for system kills    
     atexit.register(on_exit, t, True)
@@ -244,7 +235,7 @@ def parse_uart_init(mqtt_broker, mqtt_port):
     t.reset_input_buffer()
     return tag_client
 
-def report_uart_data(tag_client):
+def report_uart_data(serial_port, tag_client):
     super_frame = 0
     while True:
         try:
@@ -272,6 +263,15 @@ if __name__ == "__main__":
     
     # In Python the readline timeout is set in the serialport init part
     t = serial.Serial(tagport, baudrate=115200, timeout=3.0)
+    
+    def on_killed(signum, frame):
+        """ Closure function as handler to signal.signal in order to pass serialport name
+        """
+        # if killed by UNIX, no need to execute on_exit callback
+        atexit.unregister(on_exit)
+        sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(t.port))
+        t.close()
+    
     if sys.platform.startswith('linux'):
         import fcntl
         try:
@@ -283,12 +283,12 @@ if __name__ == "__main__":
             sys.stdout.write(timestamp_log() + "Port is ready.\n")
     
     try:
-        tag_client = parse_uart_init(MQTT_BROKER, MQTT_PORT)
+        tag_client = parse_uart_init(t, MQTT_BROKER, MQTT_PORT)
     except BaseException as e:
         sys.stdout.write(timestamp_log() + "Initialization failed. \n")
         raise e
     try:
-        report_uart_data(tag_client)
+        report_uart_data(t, tag_client)
     except BaseException as e:
         sys.stdout.write(timestamp_log() + "Reporting process failed. \n")
         raise e
