@@ -7,7 +7,7 @@ from datetime import datetime
 import subprocess, atexit, signal
 import paho.mqtt.client as mqtt
 
-# from proximity_sensor import proximity_init, proximity_start
+from proximity_sensor import proximity_init, proximity_start
 
 import json
 
@@ -219,8 +219,6 @@ def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
         time.sleep(0.1)
 
     
-    
-
 def report_uart_data(serial_port):
     sys_info = get_sys_info(serial_port)
     tag_id = sys_info.get("device_id") 
@@ -285,13 +283,41 @@ if __name__ == "__main__":
         else:
             sys.stdout.write(timestamp_log() + "Port is ready.\n")
     
+    # main thread is used for uart
+    # a secondary thread is used for proximity sensor
+    import threading
+
+    def proximity_thread_job():
+        TRIG=26
+        ECHO=16
+        PROXI=15
+        INTERVAL=2
+        startt = time.time()
+        try:
+            proximity_init(trig=TRIG, echo=ECHO)
+            while True:
+                dist = proximity_start(trig=TRIG, echo=ECHO, proximity_threshold=PROXI)
+                if not dist:
+                    print("Non in the range, greater than 15cm")
+                else:
+                    print("Distance: {} cm".format(dist))
+                time.sleep(INTERVAL)
+        except BaseException as e:
+            raise(e)
+        finally:
+            stopt = time.time()
+            print("program running time: {} seconds".format(stopt - startt))
+
+    added_thread = threading.Thread(target=proximity_thread_job, name="Proximity Sensor")
+    added_thread.start()
+    
     try:
-        tag_client = parse_uart_init(t, MQTT_BROKER, MQTT_PORT)
+        parse_uart_init(t, MQTT_BROKER, MQTT_PORT)
     except BaseException as e:
         sys.stdout.write(timestamp_log() + "Initialization failed. \n")
         raise e
     try:
-        report_uart_data(t, tag_client)
+        report_uart_data(t)
     except BaseException as e:
         sys.stdout.write(timestamp_log() + "Reporting process failed. \n")
         raise e

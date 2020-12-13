@@ -6,31 +6,31 @@ TRIG=26
 ECHO=16
 
 PROXI=15
-INTERVAL = 2
+INTERVAL=2
 # 15 CM as the maximum threshold for proximity detection
 
-def proximity_init():
+def proximity_init(trig=TRIG, echo=ECHO):
     print("Distance Measurement In Progress")
-    GPIO.setup(TRIG, GPIO.OUT)
-    GPIO.setup(ECHO, GPIO.IN)
+    GPIO.setup(trig, GPIO.OUT)
+    GPIO.setup(echo, GPIO.IN)
 
-def proximity_start(proximity_threshold=PROXI):
-    GPIO.output(TRIG, False)
+def proximity_start(trig=TRIG, echo=ECHO, proximity_threshold=PROXI):
+    GPIO.output(trig, False)
     print("Waiting for Sensor to Settle")
     time.sleep(0.00001)
 
-    GPIO.output(TRIG, True)
+    GPIO.output(trig, True)
     time.sleep(0.00001)
-    GPIO.output(TRIG, False)
+    GPIO.output(trig, False)
 
     pulse_duration_threshold = proximity_threshold / 17150
 
-    while GPIO.input(ECHO)==0:
+    while GPIO.input(echo)==0:
         pass
     pulse_start = time.time()
 
     PROX_FLAG = 1
-    while GPIO.input(ECHO)==1:
+    while GPIO.input(echo)==1:
         pulse_end = time.time()
         if pulse_end - pulse_start > pulse_duration_threshold:
             PROX_FLAG = 0
@@ -55,8 +55,8 @@ if __name__ == "__main__":
             else:
                 print("Distance: {} cm".format(dist))
             time.sleep(INTERVAL)
-    except e:
-        throw(e)
+    except BaseException as e:
+        raise(e)
     finally:
         stopt = time.time()
         print("program running time: {} seconds".format(stopt - startt))
