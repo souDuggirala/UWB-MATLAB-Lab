@@ -141,7 +141,7 @@ def is_reporting_loc(serialport, timeout=2):
     return False
 
 
-def get_sys_info(serialport, verbose=False):
+def get_sys_info(serial_port, verbose=False):
     """ Get the system config information of the tag device through UART
 
         :returns:
@@ -150,16 +150,16 @@ def get_sys_info(serialport, verbose=False):
     if verbose:
         sys.stdout.write(timestamp_log() + "Fetching system information of UWB...\n")
     sys_info = {}
-    if is_reporting_loc(serialport):
-        serialport.write(b'\x6C\x65\x63\x0D')
+    if is_reporting_loc(serial_port):
+        serial_port.write(b'\x6C\x65\x63\x0D')
         time.sleep(0.1)
     # Write "si" to show system information of DWM1001
-    serialport.reset_input_buffer()
-    serialport.write(b'\x73\x69\x0D')
+    serial_port.reset_input_buffer()
+    serial_port.write(b'\x73\x69\x0D')
     time.sleep(0.1)
-    byte_si = serialport.read(serialport.in_waiting)
+    byte_si = serial_port.read(serial_port.in_waiting)
     si = str(byte_si)
-    serialport.reset_input_buffer()
+    serial_port.reset_input_buffer()
     if verbose:
         sys.stdout.write(timestamp_log() + "Raw system info fetched as: \n" + str(byte_si, encoding="UTF-8") + "\n")
     # PANID in hexadecimal
@@ -218,7 +218,11 @@ def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
         serial_port.write(b'\x6C\x65\x63\x0D')
         time.sleep(0.1)
 
-    sys_info = get_sys_info(t)
+    
+    
+
+def report_uart_data(serial_port):
+    sys_info = get_sys_info(serial_port)
     tag_id = sys_info.get("device_id") 
     upd_rate = sys_info.get("upd_rate") 
     # type "lec\n" to the dwm shell console to activate data reporting
@@ -233,9 +237,7 @@ def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
     tag_client.connect(MQTT_BROKER, MQTT_PORT)
     sys.stdout.write(timestamp_log() + "Connected to Broker! Publishing\n")
     serial_port.reset_input_buffer()
-    return tag_client
 
-def report_uart_data(serial_port, tag_client):
     super_frame = 0
     while True:
         try:
