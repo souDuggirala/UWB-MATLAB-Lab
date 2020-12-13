@@ -92,10 +92,10 @@ def w_gauss_multi(a: List, b: List) -> float:
     assert len(a) == len(b)
     error = [a[i] - b[i] for i in range(len(a))]
     mean = [0] * len(a)
-    cov = [ [sigma,0,0,0],
-            [0,sigma,0,0],
-            [0,0,sigma,0],
-            [0,0,0,sigma]]
+    cov = [ [sigma2,0,0,0],
+            [0,sigma2,0,0],
+            [0,0,sigma2,0],
+            [0,0,0,sigma2]]
     g = multivariate_normal.pdf(x=error, mean=mean, cov=cov)
     return g
 
@@ -140,7 +140,10 @@ class WeightedDistribution(object):
 
     def pick(self):
         try:
-            return self.state[bisect.bisect_left(self.distribution, random.uniform(0, 1))]
+            uni = random.uniform(0, 1)
+            idx = bisect.bisect_left(self.distribution, uni)
+            a = self.state[idx]
+            return a
         except IndexError:
             # Happens when all particles are improbable w=0
             return None
