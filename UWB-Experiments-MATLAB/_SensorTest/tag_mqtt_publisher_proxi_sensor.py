@@ -208,21 +208,21 @@ def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
     # Pause for 0.1 sec after establishment
     time.sleep(0.1)
     # Double enter (carriage return) as specified by Decawave
-    t.write(b'\x0D\x0D')
+    serial_port.write(b'\x0D\x0D')
     time.sleep(0.1)
-    t.reset_input_buffer()
+    serial_port.reset_input_buffer()
 
     # By default the update rate is 10Hz/100ms. Check again for data flow
     # if data is flowing before getting the device ID, stop it.
     if is_reporting_loc(t):
-        t.write(b'\x6C\x65\x63\x0D')
+        serial_port.write(b'\x6C\x65\x63\x0D')
         time.sleep(0.1)
 
     sys_info = get_sys_info(t)
     tag_id = sys_info.get("device_id") 
     upd_rate = sys_info.get("upd_rate") 
     # type "lec\n" to the dwm shell console to activate data reporting
-    t.write(b'\x6C\x65\x63\x0D')
+    serial_port.write(b'\x6C\x65\x63\x0D')
     time.sleep(0.1)
     assert is_reporting_loc(t, timeout=upd_rate/10)
     
@@ -232,14 +232,14 @@ def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
     # tag_client.on_publish = mqtt_on_publish
     tag_client.connect(MQTT_BROKER, MQTT_PORT)
     sys.stdout.write(timestamp_log() + "Connected to Broker! Publishing\n")
-    t.reset_input_buffer()
+    serial_port.reset_input_buffer()
     return tag_client
 
 def report_uart_data(serial_port, tag_client):
     super_frame = 0
     while True:
         try:
-            data = str(t.readline(), encoding="UTF-8").rstrip()
+            data = str(serial_port.readline(), encoding="UTF-8").rstrip()
             if not data[:4] == "DIST":
                 continue
             json_dic = make_json_dic(data)
@@ -249,6 +249,7 @@ def report_uart_data(serial_port, tag_client):
             tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
             super_frame += 1
         except Exception as exp:
+            data = str(serial_port.readline(), encoding="UTF-8").rstrip()
             sys.stdout.write(timestamp_log() + data)
             raise exp
 
