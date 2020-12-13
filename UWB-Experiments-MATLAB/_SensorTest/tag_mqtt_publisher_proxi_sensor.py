@@ -7,12 +7,10 @@ from datetime import datetime
 import subprocess, atexit, signal
 import paho.mqtt.client as mqtt
 
-from proximity_sensor import proximity_init, proximity_start
+# from proximity_sensor import proximity_init, proximity_start
 
 import json
 
-MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
 
 def timestamp_log(incl_UTC=False):
     """ Get the timestamp for the stdout log message
@@ -27,24 +25,11 @@ def timestamp_log(incl_UTC=False):
     else:
         return local_timestp
 
+
 def mqtt_on_publish(client, data, result):
     # TODO: Define actions to take if mqtt_on_publish is needed
     pass
 
-def is_reporting_loc(serialport, timeout=2):
-    """ Detect if the DWM1001 Tag is running on data reporting mode
-        
-        :returns:
-            True or False
-    """
-    init_bytes_avail = serialport.in_waiting
-    time.sleep(timeout)
-    final_bytes_avail = serialport.in_waiting
-    if final_bytes_avail - init_bytes_avail > 0:
-        time.sleep(0.1)
-        return True
-    time.sleep(0.1)
-    return False
 
 def is_uwb_shell_ok(serialport):
     """ Detect if the DWM1001 Tag's shell console is responding to \x0D\x0D
@@ -61,6 +46,7 @@ def is_uwb_shell_ok(serialport):
     else:
         return False
 
+
 def get_tag_serial_port(verbose=False):
     """ Detect the serial port name of DWM1001 Tag
 
@@ -75,9 +61,10 @@ def get_tag_serial_port(verbose=False):
     import serial.tools.list_ports
     if sys.platform.startswith('win'):
         # assume there is only one J-Link COM port
-        ports += [str(i).split(' - ')[0]
-                    for  i in serial.tools.list_ports.comports() 
-                    if "JLink" in str(i)]
+        # ports += [str(i).split(' - ')[0]
+        #             for  i in serial.tools.list_ports.comports() 
+        #             if "JLink" in str(i)]
+        ports = ['COM5']
     elif sys.platform.startswith('linux'):
         # the UART between RPi adn DWM1001-Dev is designated as serial0
         # with the drivers installed. 
@@ -94,11 +81,65 @@ def get_tag_serial_port(verbose=False):
         try:
             s = serial.Serial(port)
             s.close()
-        except:
-            raise ConnectionError("Wrong serial port detected for UWB tag")
+        except BaseException as e:
+            print("Wrong serial port detected for UWB tag")
+            raise e
     if verbose:
         sys.stdout.write(timestamp_log() + "Serialport fetched as: " + str(ports))
     return ports
+
+
+def on_exit(serialport, verbose=False):
+    """ On exit callbacks to make sure the serialport is closed when
+        the program ends.
+    """
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serialport.port))
+    serialport.close()
+
+
+def available_ttys(portlist):
+    """ Generator to yield all available ports that are not locked by flock.
+        Filters out the ports that are already opened. Preventing the program
+        from running on multilple processes.
+        
+        Notice: if the other processes don't use flock, that process(es) will
+        still be able to open the port, skipping the flock protection.
+        
+        Only works for POSIX/LINUX environment. 
+        
+        :yield:timestamp_log() + "Port is busy\n"
+            Comports that aren't locked by flock.
+    """
+    for tty in portlist:
+        try:
+            port = serial.Serial(port=tty[0])
+            if port.isOpen():
+                try:
+                    fcntl.flock(port.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except (IOError, BlockingIOError):
+                    sys.stdout.write(timestamp_log() + "Port is busy\n")
+                else:
+                    yield port
+        except serial.SerialException as ex:
+            print('Port {0} is unavailable: {1}'.format(tty, ex))
+
+
+def is_reporting_loc(serialport, timeout=2):
+    """ Detect if the DWM1001 Tag is running on data reporting mode
+        
+        :returns:
+            True or False
+    """
+    init_bytes_avail = serialport.in_waiting
+    time.sleep(timeout)
+    final_bytes_avail = serialport.in_waiting
+    if final_bytes_avail - init_bytes_avail > 0:
+        time.sleep(0.1)
+        return True
+    time.sleep(0.1)
+    return False
+
 
 def get_sys_info(serialport, verbose=False):
     """ Get the system config information of the tag device through UART
@@ -133,6 +174,7 @@ def get_sys_info(serialport, verbose=False):
     
     return sys_info
 
+
 def make_json_dic(raw_string):
     # sample input:
     # les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
@@ -157,72 +199,22 @@ def make_json_dic(raw_string):
     data['est_qual'] = float(raw_elem[-1])
     return data
 
-def on_exit(serialport, verbose=False):
-    """ On exit callbacks to make sure the serialport is closed when
-        the program ends.
-    """
-    if verbose:
-        sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serialport.port))
-    serialport.close()
 
-def available_ttys(portlist):
-    """ Generator to yield all available ports that are not locked by flock.
-        Filters out the ports that are already opened. Preventing the program
-        from running on multilple processes.
-        
-        Notice: if the other processes don't use flock, that process(es) will
-        still be able to open the port, skipping the flock protection.
-        
-        Only works for POSIX/LINUX environment. 
-        
-        :yield:timestamp_log() + "Port is busy\n"
-            Comports that aren't locked by flock.
-    """
-    for tty in portlist:
-        try:
-            port = serial.Serial(port=tty[0])
-            if port.isOpen():
-                try:
-                    fcntl.flock(port.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except (IOError, BlcokingIOError):
-                    sys.stdout.write(timestamp_log() + "Port is busy\n")
-                else:
-                    yield port
-        except serial.SerialException as ex:
-            print('Port {0} is unavailable: {1}'.format(tty, ex))
-
-
-if __name__ == "__main__":
-    sys.stdout.write(timestamp_log() + "MQTT publisher service started. PID: {}\n".format(os.getpid()))
-    com_ports = get_tag_serial_port()
-    tagport = com_ports.pop()
-    assert len(com_ports) == 0
-    
-    # In Python the readline timeout is set in the serialport init part
-    t = serial.Serial(tagport, baudrate=115200, timeout=3.0)
-    if sys.platform.startswith('linux'):
-        import fcntl
-        try:
-            fcntl.flock(t.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (IOError, BlockingIOError) as exp:
-            sys.stdout.write(timestamp_log() + "Port is busy. Another process is accessing the port. \n")
-            raise exp
-        else:
-            sys.stdout.write(timestamp_log() + "Port is ready.\n")
-        
-        
-    def on_killed(signum, frame):
+def on_killed(signum, frame):
         """ Closure function as handler to signal.signal in order to pass serialport name
         """
         # if killed by UNIX, no need to execute on_exit callback
         atexit.unregister(on_exit)
         sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(t.port))
         t.close()
+
+
+def parse_uart_init(mqtt_broker, mqtt_port):
     # register the callback functions when the service ends
     # atexit for regular exit, signal.signal for system kills    
     atexit.register(on_exit, t, True)
     signal.signal(signal.SIGTERM, on_killed)
-    # Pause for 1 sec after establishment
+    # Pause for 0.1 sec after establishment
     time.sleep(0.1)
     # Double enter (carriage return) as specified by Decawave
     t.write(b'\x0D\x0D')
@@ -250,7 +242,9 @@ if __name__ == "__main__":
     tag_client.connect(MQTT_BROKER, MQTT_PORT)
     sys.stdout.write(timestamp_log() + "Connected to Broker! Publishing\n")
     t.reset_input_buffer()
+    return tag_client
 
+def report_uart_data(tag_client):
     super_frame = 0
     while True:
         try:
@@ -266,3 +260,37 @@ if __name__ == "__main__":
         except Exception as exp:
             sys.stdout.write(timestamp_log() + data)
             raise exp
+
+if __name__ == "__main__":
+    
+    MQTT_BROKER = "localhost"
+    MQTT_PORT = 1883
+    sys.stdout.write(timestamp_log() + "MQTT publisher service started. PID: {}\n".format(os.getpid()))
+    com_ports = get_tag_serial_port()
+    tagport = com_ports.pop()
+    assert len(com_ports) == 0
+    
+    # In Python the readline timeout is set in the serialport init part
+    t = serial.Serial(tagport, baudrate=115200, timeout=3.0)
+    if sys.platform.startswith('linux'):
+        import fcntl
+        try:
+            fcntl.flock(t.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, BlockingIOError) as exp:
+            sys.stdout.write(timestamp_log() + "Port is busy. Another process is accessing the port. \n")
+            raise exp
+        else:
+            sys.stdout.write(timestamp_log() + "Port is ready.\n")
+    
+    try:
+        tag_client = parse_uart_init(MQTT_BROKER, MQTT_PORT)
+    except BaseException as e:
+        sys.stdout.write(timestamp_log() + "Initialization failed. \n")
+        raise e
+    try:
+        report_uart_data(tag_client)
+    except BaseException as e:
+        sys.stdout.write(timestamp_log() + "Reporting process failed. \n")
+        raise e
+
+    
