@@ -7,6 +7,7 @@ ECHO=16
 
 PROXI=15
 INTERVAL=2
+TIMEOUT=2
 # 15 CM as the maximum threshold for proximity detection
 
 def proximity_init(trig=TRIG, echo=ECHO):
@@ -14,7 +15,7 @@ def proximity_init(trig=TRIG, echo=ECHO):
     GPIO.setup(trig, GPIO.OUT)
     GPIO.setup(echo, GPIO.IN)
 
-def proximity_start(trig=TRIG, echo=ECHO, proximity_threshold=PROXI):
+def proximity_start(trig=TRIG, echo=ECHO, proximity_threshold=PROXI, timeout=TIMEOUT):
     GPIO.output(trig, False)
 #    print("Waiting for Sensor to Settle")
     time.sleep(0.00001)
@@ -24,23 +25,25 @@ def proximity_start(trig=TRIG, echo=ECHO, proximity_threshold=PROXI):
     GPIO.output(trig, False)
 
     pulse_duration_threshold = proximity_threshold / 17150
-
+    timeout_start = time.time()
     while GPIO.input(echo)==0:
-        pass
-    pulse_start = time.time()
+        timeout_monitor = time.time()
+        if timeout_monitor - timeout_start > timeout:
+            return -1
 
+    pulse_start = time.time()
+    pulse_end = pulse_start
     PROX_FLAG = 1
     while GPIO.input(echo)==1:
         pulse_end = time.time()
         if pulse_end - pulse_start > pulse_duration_threshold:
             PROX_FLAG = 0
             break
-        
+    
     if PROX_FLAG:
         pulse_duration = pulse_end - pulse_start
         dist = pulse_duration * 17150
         dist = round(dist, 2)
-        
         return dist
     else:
         return None
