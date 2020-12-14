@@ -16,7 +16,7 @@ def proximity_init(trig=TRIG, echo=ECHO):
 
 def proximity_start(trig=TRIG, echo=ECHO, proximity_threshold=PROXI):
     GPIO.output(trig, False)
-    print("Waiting for Sensor to Settle")
+#    print("Waiting for Sensor to Settle")
     time.sleep(0.00001)
 
     GPIO.output(trig, True)
@@ -61,3 +61,4 @@ if __name__ == "__main__":
         stopt = time.time()
         print("program running time: {} seconds".format(stopt - startt))
         GPIO.cleanup()
+  

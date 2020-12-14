@@ -219,7 +219,8 @@ def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
         time.sleep(0.1)
 
     
-def report_uart_data(serial_port):
+def report_uart_data(serial_port, buffer):
+    # buffer[0] passes the proximity sensor data acquired in a separate thread
     sys_info = get_sys_info(serial_port)
     tag_id = sys_info.get("device_id") 
     upd_rate = sys_info.get("upd_rate") 
@@ -245,6 +246,7 @@ def report_uart_data(serial_port):
             json_dic = make_json_dic(data)
             json_dic['tag_id'] = tag_id
             json_dic['superFrameNumber'] = super_frame
+            json_dic['proximity'] = buffer[0] if buffer[0] is not None else "OutOfRange"
             json_data = json.dumps(json_dic)
             tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
             super_frame += 1
@@ -287,28 +289,30 @@ if __name__ == "__main__":
     # a secondary thread is used for proximity sensor
     import threading
 
-    def proximity_thread_job():
+    def proximity_thread_job(threshold, interval, proximity_buffer):
+        # modifies proximity_buffer[0] and referred from the main thread to publish into MQTT
         TRIG=26
         ECHO=16
-        PROXI=15
-        INTERVAL=2
+        PROXI=threshold
+        INTERVAL=interval
         startt = time.time()
         try:
             proximity_init(trig=TRIG, echo=ECHO)
             while True:
                 dist = proximity_start(trig=TRIG, echo=ECHO, proximity_threshold=PROXI)
-                if not dist:
-                    print("Non in the range, greater than 15cm")
-                else:
-                    print("Distance: {} cm".format(dist))
                 time.sleep(INTERVAL)
+                proximity_buffer[0] = dist
         except BaseException as e:
             raise(e)
-        finally:
-            stopt = time.time()
-            print("program running time: {} seconds".format(stopt - startt))
 
-    added_thread = threading.Thread(target=proximity_thread_job, name="Proximity Sensor")
+        
+    
+    proximity_buffer = [None]
+    proximity_threshold, interval = 15, 2
+    
+    added_thread = threading.Thread(target=proximity_thread_job, 
+                                    args=(proximity_threshold, interval, proximity_buffer,),
+                                    name="Proximity Sensor")
     added_thread.start()
     
     try:
@@ -317,9 +321,9 @@ if __name__ == "__main__":
         sys.stdout.write(timestamp_log() + "Initialization failed. \n")
         raise e
     try:
-        report_uart_data(t)
+        report_uart_data(t, proximity_buffer)
     except BaseException as e:
         sys.stdout.write(timestamp_log() + "Reporting process failed. \n")
         raise e
 
-    
+     
