@@ -13,6 +13,7 @@ from lcd import lcd_init, lcd_disp
 
 import json, threading
 
+
 # Constants for the MQTT
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
@@ -30,7 +31,7 @@ def timestamp_log(incl_UTC=False):
         return local_timestp + utc_timestp
     else:
         return local_timestp
-
+    
 
 def mqtt_on_publish(client, data, result):
     # TODO: Define actions to take if mqtt_on_publish is needed
@@ -101,7 +102,11 @@ def on_exit(serialport, verbose=False):
     """
     if verbose:
         sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serialport.port))
+    if sys.platform.startswith('linux'):
+        import fcntl
+        fcntl.flock(serialport, fcntl.LOCK_UN)
     serialport.close()
+    
 
 
 def available_ttys(portlist):
@@ -117,6 +122,7 @@ def available_ttys(portlist):
         :yield:timestamp_log() + "Port is busy\n"
             Comports that aren't locked by flock.
     """
+    assert sys.platform.startswith('linux')
     for tty in portlist:
         try:
             port = serial.Serial(port=tty[0])
@@ -232,8 +238,9 @@ def report_uart_data(serial_port, uwb_pointer, proximity_pointer):
     tag_id = sys_info.get("device_id") 
     upd_rate = sys_info.get("upd_rate") 
     # type "lec\n" to the dwm shell console to activate data reporting
-    serial_port.write(b'\x6C\x65\x63\x0D')
-    time.sleep(0.1)
+    if not is_reporting_loc(t, timeout=upd_rate/10):        
+        serial_port.write(b'\x6C\x65\x63\x0D')
+        time.sleep(0.1)
     assert is_reporting_loc(t, timeout=upd_rate/10)
     
     # location data flow is confirmed. Start publishing to localhost (MQTT)
@@ -266,7 +273,6 @@ def report_uart_data(serial_port, uwb_pointer, proximity_pointer):
             raise exp
 
 if __name__ == "__main__":
-    
     sys.stdout.write(timestamp_log() + "MQTT publisher service started. PID: {}\n".format(os.getpid()))
     com_ports = get_tag_serial_port()
     tagport = com_ports.pop()
@@ -282,13 +288,16 @@ if __name__ == "__main__":
         # if killed by UNIX, no need to execute on_exit callback
         atexit.unregister(on_exit)
         sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(t.port))
+        if sys.platform.startswith('linux'):
+            import fcntl
+            fcntl.flock(t, fcntl.LOCK_UN)
         t.close()
 
     def port_available_check():
         if sys.platform.startswith('linux'):
             import fcntl
         try:
-            fcntl.flock(t.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(t, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except (IOError, BlockingIOError) as exp:
             sys.stdout.write(timestamp_log() + "Port is busy. Another process is accessing the port. \n")
             raise exp

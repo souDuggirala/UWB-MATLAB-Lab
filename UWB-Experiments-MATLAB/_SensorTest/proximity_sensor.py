@@ -1,23 +1,39 @@
+import os, sys
 import RPi.GPIO as GPIO
 import time
-GPIO.setmode(GPIO.BCM)
+from datetime import datetime
 
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
 TRIG=26
 ECHO=16
 
-PROXI=15
-INTERVAL=2
+PROXI=25
+INTERVAL=0.5
 TIMEOUT=2
 # 15 CM as the maximum threshold for proximity detection
 
+
+def timestamp_log(incl_UTC=False):
+    """ Get the timestamp for the stdout log message
+        
+        :returns:
+            string format local timestamp with option to include UTC 
+    """
+    local_timestp = "["+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))+" local] "
+    utc_timestp = "["+str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))+" UTC] "
+    if incl_UTC:
+        return local_timestp + utc_timestp
+    else:
+        return local_timestp
+
 def proximity_init(trig=TRIG, echo=ECHO):
-    print("Distance Measurement In Progress")
+    sys.stdout.write(timestamp_log() + "Distance Measurement Started\n")
     GPIO.setup(trig, GPIO.OUT)
     GPIO.setup(echo, GPIO.IN)
 
 def proximity_start(trig=TRIG, echo=ECHO, proximity_threshold=PROXI, timeout=TIMEOUT):
     GPIO.output(trig, False)
-#    print("Waiting for Sensor to Settle")
     time.sleep(0.00001)
 
     GPIO.output(trig, True)
@@ -54,14 +70,14 @@ if __name__ == "__main__":
         while True:
             dist = proximity_start()
             if not dist:
-                print("Non in the range, greater than 15cm")
+                sys.stdout.write(timestamp_log() + "Non in the range, greater than 15cm\n")
             else:
-                print("Distance: {} cm".format(dist))
+                sys.stdout.write(timestamp_log() + "Distance: {} cm\n".format(dist))
             time.sleep(INTERVAL)
     except BaseException as e:
         raise(e)
     finally:
         stopt = time.time()
-        print("program running time: {} seconds".format(stopt - startt))
+        sys.stdout.write(timestamp_log() + "program running time: {} seconds".format(stopt - startt))
         GPIO.cleanup()
   
