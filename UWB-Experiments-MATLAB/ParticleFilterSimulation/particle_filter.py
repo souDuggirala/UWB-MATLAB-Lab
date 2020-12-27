@@ -17,6 +17,8 @@ import numpy as np
 from scipy.stats import multivariate_normal
 from draw import Maze
 
+import time
+
 """
 # Smaller maze
 
@@ -89,15 +91,18 @@ def w_gauss(a, b):
 # values near to robbie's measurement => 1, further away => 0
 # the pdf value is not normalized
 def w_gauss_multi(a: List, b: List) -> float:
+    a = np.asarray(list(filter(lambda x: x != float('inf'), a)))
+    b = np.asarray(list(filter(lambda x: x != float('inf'), b)))
     assert len(a) == len(b)
-    error = [a[i] - b[i] for i in range(len(a))]
-    mean = [0] * len(a)
-    cov = [ [sigma2,0,0,0],
-            [0,sigma2,0,0],
-            [0,0,sigma2,0],
-            [0,0,0,sigma2]]
-    g = multivariate_normal.pdf(x=error, mean=mean, cov=cov)
-    return g
+    dim = len(a)
+    if dim > 0:
+        error = a - b
+        mean = np.zeros(dim, float)
+        cov = np.zeros((dim,dim), float)
+        np.fill_diagonal(cov, sigma2)
+        g = multivariate_normal.pdf(x=error, mean=mean, cov=cov)
+        return g
+
 
 # ------------------------------------------------------------------------
 def compute_mean_point(particles):
@@ -176,7 +181,7 @@ class Particle(object):
     def create_random_particles(cls, particle_count, maze):
         return [cls(*maze.random_free_place()) for _ in range(0, particle_count)]
 
-    def read_sensor(self, maze):
+    def read_nearest_sensor(self, maze):
         """
         Find distance to nearest beacon.
         """
@@ -187,6 +192,15 @@ class Particle(object):
         Find all distances to all available beacons.
         """
         return maze.distances_to_all_beacons(*self.xy)
+        # if not specified_idx:
+        #     return readings
+        # if specified_idx:
+        #     # Choose specified sensors within all t
+        #     # positive infinity in readings indicates signal loss - the beacon 
+        #     # is not reachable
+        #     for i in specified_idx:
+        #         readings[i] = float('inf')
+        #     return readings
 
     def advance_by(self, speed, checker=None, noisy=False):
         h = self.h
@@ -207,7 +221,7 @@ class Particle(object):
 
 # ------------------------------------------------------------------------
 class Robot(Particle):
-    speed = 0
+    speed = 0.5
 
     def __init__(self, maze):
         super(Robot, self).__init__(*maze.random_free_place(), heading=90)
@@ -218,19 +232,21 @@ class Robot(Particle):
         heading = random.uniform(0, 360)
         self.h = heading
 
-    def read_sensor(self, maze):
+    def read_nearest_sensor(self, maze):
         """
         Poor robot, it's sensors are noisy and pretty strange,
         it only can measure the distance to the nearest beacon(!)
         and is not very accurate at that too!
         """
-        return add_little_noise(super(Robot, self).read_sensor(maze))[0]
+        return add_little_noise(super(Robot, self).read_nearest_sensor(maze))[0]
     
     def read_sensors(self, maze):
         """
-        Poor robot, it's sensors are noisy and pretty strange,
-        it only can measure the distance to the nearest beacon(!)
-        and is not very accurate at that too!
+        Returns the distances to all the sensors (beacons) in the same order as
+        the way sensors are stored (maze.beacons). 
+        -------------
+        random_loss: True/False
+            Simulate the randomized reading loss for some of the sensors (beacons)
         """
         return add_little_noise(super(Robot, self).read_sensors(maze))
 
@@ -249,8 +265,8 @@ class Robot(Particle):
 
 # ------------------------------------------------------------------------
 if __name__ == "__main__":
+    RANDOM_LOSS = True
     world = Maze(maze_data)
-    world.draw()
 
     # initial distribution assigns each particle an equal probability
     particles = Particle.create_random_particles(PARTICLE_COUNT, world)
@@ -263,29 +279,46 @@ if __name__ == "__main__":
         # for particles and adjust particle weights accordingly. 
         # Update particle weight according to how good every particle matches
         # robbie's sensor reading
-        # r_d = robbie.read_sensor(world)
+        # r_d = robbie.read_nearest_sensor(world)
         # for p in particles:
         #     if world.is_free(*p.xy):
-        #         p_d = p.read_sensor(world)
+        #         p_d = p.read_nearest_sensor(world)
         #         p.w = w_gauss(r_d, p_d)
         #     else:
         #         p.w = 0
-        r_ds = robbie.read_sensors(world)
-        for p in particles:
-            if world.is_free(*p.xy):
-                p_ds = p.read_sensors(world)
-                p.w = w_gauss_multi(r_ds, p_ds)
-            else:
-                p.w = 0
+        # time.sleep(0.5)
+        if not RANDOM_LOSS:
+            r_ds = robbie.read_sensors(world)
+            for p in particles:
+                if world.is_free(*p.xy):
+                    p_ds = p.read_sensors(world)
+                    p.w = w_gauss_multi(r_ds, p_ds)
+                else:
+                    p.w = 0
+        else:
+            r_ds = robbie.read_sensors(world)
+            chosen_idx = random.sample(range(len(r_ds)), random.randint(0, len(r_ds)))
+            for i in chosen_idx:
+                r_ds[i] = float('inf')
+            for p in particles:
+                if world.is_free(*p.xy):
+                    p_ds = p.read_sensors(world)
+                    for i in chosen_idx:
+                        p_ds[i] = float('inf')
+                    new_weight = w_gauss_multi(r_ds, p_ds)
+                    if new_weight:
+                        p.w = w_gauss_multi(r_ds, p_ds)
+                else:
+                    p.w = 0
 
         # ---------- Try to find current best estimate for display ----------
         m_x, m_y, m_confident = compute_mean_point(particles)
 
         # ---------- Show current state ----------
+        world.draw(chosen_idx)
         world.show_particles(particles)
         world.show_mean(m_x, m_y, m_confident)
         world.show_robot(robbie)
-
         # ---------- Shuffle particles ----------
         new_particles = []
 

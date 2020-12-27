@@ -44,8 +44,9 @@ class Maze(object):
                     if block == 3: # one at center only
                         self.beacons.append((x + self.block_witdh/2, nb_y + self.block_witdh/2))
 
-    def draw(self):
+    def draw(self, lost_beacons):
         # draw the blocks of the maze
+        turtle.color("#000000")
         for x, y in self.blocks:
             turtle.up()
             turtle.setposition(x, y)
@@ -59,11 +60,14 @@ class Maze(object):
             turtle.up()
 
         # draw the beacons/anchors
-        turtle.color("#00ffff")
-        for x, y in self.beacons:
+        for i in range(len(self.beacons)):
+            x, y = self.beacons[i]
             turtle.setposition(x, y)
-            turtle.dot()
-        turtle.update()
+            if i in lost_beacons:
+                turtle.dot(20, 'white')
+            else:
+                turtle.dot(20, 'red')
+        turtle.stamp()
 
     def weight_to_color(self, weight):
         return "#%02x00%02x" % (int(weight * 255), int((1 - weight) * 255))
@@ -142,7 +146,7 @@ class Maze(object):
     def euclidean_dist(self, x1, y1, x2, y2):
         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
-    def distance_to_nearest_beacon(self, x, y):
+    def distance_to_nearest_beacon(self, x, y) -> float:
         d = float('inf')
         for c_x, c_y in self.beacons:
             distance = self.euclidean_dist(c_x, c_y, x, y)
