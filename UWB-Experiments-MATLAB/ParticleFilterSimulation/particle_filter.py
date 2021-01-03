@@ -19,41 +19,45 @@ from draw import Maze
 
 import time
 
-"""
-# Smaller maze
+# maze_data = ((3,0,3), (0,2,0), (3,0,3))
 
+# Smaller maze
+"""
 maze_data = ( ( 2, 0, 1, 0, 0 ),
               ( 0, 0, 0, 0, 1 ),
               ( 1, 1, 1, 0, 0 ),
               ( 1, 0, 0, 0, 0 ),
               ( 0, 0, 2, 0, 1 ))
-"""
 
+"""
 # 0 - empty square
 # 1 - occupied square
 # 2 - occupied square with a beacon at center, detectable by the robot
 
-# maze_data = ( ( 1, 1, 0, 0, 2, 0, 0, 0, 0, 1 ),
-#               ( 1, 2, 0, 0, 1, 1, 0, 0, 0, 0 ),
-#               ( 0, 1, 1, 0, 0, 0, 0, 1, 0, 1 ),
-#               ( 0, 0, 0, 0, 1, 0, 0, 1, 1, 2 ),
-#               ( 1, 1, 0, 1, 1, 2, 0, 0, 1, 0 ),
-#               ( 1, 1, 1, 0, 1, 1, 1, 0, 2, 0 ),
-#               ( 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#               ( 1, 2, 0, 1, 1, 1, 1, 0, 0, 0 ),
-#               ( 0, 0, 0, 0, 1, 0, 0, 0, 1, 0 ),
-#               ( 0, 0, 1, 0, 0, 2, 1, 1, 1, 0 ))
 
-maze_data = ( ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
+maze_data = ( ( 1, 1, 0, 0, 2, 0, 0, 0, 0, 1 ),
+               ( 1, 2, 0, 0, 1, 1, 0, 0, 0, 0 ),
+               ( 0, 1, 1, 0, 0, 0, 0, 1, 0, 1 ),
+               ( 0, 0, 0, 0, 1, 0, 0, 1, 1, 2 ),
+               ( 1, 1, 0, 1, 1, 2, 0, 0, 1, 0 ),
+               ( 1, 1, 1, 0, 1, 1, 1, 0, 2, 0 ),
+               ( 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+               ( 1, 2, 0, 1, 1, 1, 1, 0, 0, 0 ),
+               ( 0, 0, 0, 0, 1, 0, 0, 0, 1, 0 ),
+               ( 0, 0, 1, 0, 0, 2, 1, 1, 1, 0 ))
+
+"""
+#maze_data = ( ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
+#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#              ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
+"""
 
 PARTICLE_COUNT = 2000    # Total number of particles
 
@@ -287,6 +291,8 @@ if __name__ == "__main__":
         #     else:
         #         p.w = 0
         # time.sleep(0.5)
+        chosen_idx = []
+
         if not RANDOM_LOSS:
             r_ds = robbie.read_sensors(world)
             for p in particles:
@@ -297,7 +303,7 @@ if __name__ == "__main__":
                     p.w = 0
         else:
             r_ds = robbie.read_sensors(world)
-            chosen_idx = random.sample(range(len(r_ds)), random.randint(0, len(r_ds)))
+            chosen_idx = random.sample(range(len(r_ds)), random.randint(0, len(r_ds))) #returns a list of random anchors to turn unusable
             for i in chosen_idx:
                 r_ds[i] = float('inf')
             for p in particles:
@@ -307,7 +313,7 @@ if __name__ == "__main__":
                         p_ds[i] = float('inf')
                     new_weight = w_gauss_multi(r_ds, p_ds)
                     if new_weight:
-                        p.w = w_gauss_multi(r_ds, p_ds)
+                        p.w = new_weight
                 else:
                     p.w = 0
 

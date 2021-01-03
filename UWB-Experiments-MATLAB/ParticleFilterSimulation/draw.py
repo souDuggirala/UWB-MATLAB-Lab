@@ -27,7 +27,7 @@ class Maze(object):
         self.maze = maze_matrix
         self.width   = len(maze_matrix[0])
         self.height  = len(maze_matrix)
-        self.block_witdh = block_width
+        self.block_width = block_width
         turtle.setworldcoordinates(0, 0, self.width, self.height)
         self.blocks = []
         self.update_cnt = 0
@@ -36,13 +36,13 @@ class Maze(object):
         for y, line in enumerate(self.maze):
             for x, block in enumerate(line):
                 if block:
-                    nb_y = self.height - y - self.block_witdh
+                    nb_y = self.height - y - self.block_width
                     # (x, nb_y) is the lower-left corner of the block
                     self.blocks.append((x, nb_y))
                     if block == 2: # one at each corner
-                        self.beacons.extend(((x, nb_y), (x+1, nb_y), (x, nb_y+1), (x+1, nb_y+1)))
+                        self.beacons.extend(((x, nb_y), (x+self.block_width, nb_y), (x, nb_y+self.block_width), (x+self.block_width, nb_y+self.block_width)))
                     if block == 3: # one at center only
-                        self.beacons.append((x + self.block_witdh/2, nb_y + self.block_witdh/2))
+                        self.beacons.append((x + self.block_width/2, nb_y + self.block_width/2))
 
     def draw(self, lost_beacons):
         # draw the blocks of the maze
@@ -54,7 +54,7 @@ class Maze(object):
             turtle.setheading(90)
             turtle.begin_fill()
             for _ in range(0, 4):
-                turtle.fd(self.block_witdh)
+                turtle.fd(self.block_width)
                 turtle.right(90)
             turtle.end_fill()
             turtle.up()
