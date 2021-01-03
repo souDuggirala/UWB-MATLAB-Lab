@@ -8,9 +8,6 @@ from datetime import datetime
 import subprocess, atexit, signal
 import paho.mqtt.client as mqtt
 
-from proximity_sensor import proximity_init, proximity_start
-from lcd import lcd_init, lcd_disp
-
 import json, threading
 
 
@@ -71,7 +68,7 @@ def get_tag_serial_port(verbose=False):
         # ports += [str(i).split(' - ')[0]
         #             for  i in serial.tools.list_ports.comports() 
         #             if "JLink" in str(i)]
-        ports = ['COM5']
+        ports = ['COM6']
     elif sys.platform.startswith('linux'):
         # the UART between RPi adn DWM1001-Dev is designated as serial0
         # with the drivers installed. 
@@ -89,7 +86,7 @@ def get_tag_serial_port(verbose=False):
             s = serial.Serial(port)
             s.close()
         except BaseException as e:
-            print("Wrong serial port detected for UWB tag")
+            sys.stdout.write(timestamp_log() + "Wrong serial port detected for UWB tag\n")
             raise e
     if verbose:
         sys.stdout.write(timestamp_log() + "Serialport fetched as: " + str(ports))
@@ -107,7 +104,6 @@ def on_exit(serialport, verbose=False):
         fcntl.flock(serialport, fcntl.LOCK_UN)
     serialport.close()
     
-
 
 def available_ttys(portlist):
     """ Generator to yield all available ports that are not locked by flock.
@@ -134,22 +130,21 @@ def available_ttys(portlist):
                 else:
                     yield port
         except serial.SerialException as ex:
-            print('Port {0} is unavailable: {1}'.format(tty, ex))
+            sys.stdout.write(timestamp_log() + 'Port {0} is unavailable: {1}'.format(tty, ex))
 
 
-def is_reporting_loc(serialport, timeout=2):
+def is_reporting_loc(serialport, timeout):
     """ Detect if the DWM1001 Tag is running on data reporting mode
         
         :returns:
             True or False
     """
+    serialport.reset_input_buffer()
     init_bytes_avail = serialport.in_waiting
     time.sleep(timeout)
     final_bytes_avail = serialport.in_waiting
     if final_bytes_avail - init_bytes_avail > 0:
-        time.sleep(0.1)
         return True
-    time.sleep(0.1)
     return False
 
 
@@ -162,11 +157,8 @@ def get_sys_info(serial_port, verbose=False):
     if verbose:
         sys.stdout.write(timestamp_log() + "Fetching system information of UWB...\n")
     sys_info = {}
-    if is_reporting_loc(serial_port):
-        serial_port.write(b'\x6C\x65\x63\x0D')
-        time.sleep(0.1)
-    # Write "si" to show system information of DWM1001
     serial_port.reset_input_buffer()
+    # Write "si" to show system information of DWM1001
     serial_port.write(b'\x73\x69\x0D')
     time.sleep(0.1)
     byte_si = serial_port.read(serial_port.in_waiting)
@@ -188,27 +180,49 @@ def get_sys_info(serial_port, verbose=False):
 
 
 def make_json_dic(raw_string):
-    # sample input:
+    # sample input, OEM firmware:
     # les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
     # lep\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
     # lec\n: POS,7.10,5.24,-2.03,53
+    # sample input, modified firmware (automatically reports after initiation):
+    #   DIST,4;                               (cont.)
+    #   [AN0,C584,370,200,780]=[927,100];     (cont.)
+    #   [AN1,DA36,210,3350,1290]=[2257,100];  (cont.)
+    #   [AN2,8287,2690,360,660]=[2313,100];   (cont.)
+    #   [AN3,9234,2950,2780,1180]=[2740,100]; (cont.)
+    #   POS=[517,1161,1190,62];                 (cont.)
+    #   ACC=[7936,0,0];                       (cont.)
+    #   UWBLOCALTIME,36789731;
     data = {}
-    # parse csv
-    raw_elem = raw_string.split(',')
-    num_anc = int(raw_elem[1])
-    data['anc_num'] = int(raw_elem[1])
-    for i in range(num_anc):
-        data[raw_elem[2+6*i]] = {}
-        data[raw_elem[2+6*i]]['anc_id'] = raw_elem[2+6*i+1]
-        data[raw_elem[2+6*i]]['x'] = float(raw_elem[2+6*i+2])
-        data[raw_elem[2+6*i]]['y'] = float(raw_elem[2+6*i+3])
-        data[raw_elem[2+6*i]]['z'] = float(raw_elem[2+6*i+4])
-        data[raw_elem[2+6*i]]['dist_to'] = float(raw_elem[2+6*i+5])
-    data['est_pos'] = {}
-    data['est_pos']['x'] = float(raw_elem[-4])
-    data['est_pos']['y'] = float(raw_elem[-3])
-    data['est_pos']['z'] = float(raw_elem[-2])
-    data['est_qual'] = float(raw_elem[-1])
+    # parse comma and semicolon deliminated raw string
+    raw_elem = raw_string.split(';')
+    anc_num = int(raw_elem[0].split(',')[1])
+    data['anc_num'] = anc_num
+    for i in range(1, anc_num+1):
+        anchor_field = raw_elem[i].split('=')
+        anc_info_field, anc_meas_field = anchor_field[0].split(','), anchor_field[1].split(',')
+        anc_name = anc_info_field[0][1:]
+        data[anc_name] = {}
+        data[anc_name]['anc_id'] = anc_info_field[1][:]
+        data[anc_name]['x'] = int(anc_info_field[2][:]) / 1000
+        data[anc_name]['y'] = int(anc_info_field[3][:]) / 1000
+        data[anc_name]['z'] = int(anc_info_field[4][:-1]) / 1000
+        data[anc_name]['dist_to'] = int(anc_meas_field[0][1:]) / 1000
+        data[anc_name]['dist_qual'] = float(anc_meas_field[1][:-1])
+    if 'POS=' in raw_string:
+        pos_field = raw_elem[anc_num+1].split(',')
+        data['est_pos'] = {}
+        data['est_pos']['x'] = int(pos_field[0][5:]) / 1000
+        data['est_pos']['y'] = int(pos_field[1][:]) / 1000
+        data['est_pos']['z'] = int(pos_field[2][:]) / 1000
+        data['est_pos']['est_qual'] = float(pos_field[3][:-1])
+    if 'ACC=' in raw_string:
+        # Acc units are in multiplies of gravity
+        acc_field = raw_elem[-3].split(',')
+        data['acc'] = {}
+        data['acc']['x'] = int(acc_field[0][5:])    
+        data['acc']['y'] = int(acc_field[1][:])     
+        data['acc']['z'] = int(acc_field[2][:-1])   
     return data
 
 
@@ -231,17 +245,26 @@ def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
         time.sleep(0.1)
 
     
-def report_uart_data(serial_port, uwb_pointer, proximity_pointer):
-    # uwb_pointer[0] is the pointer used to pass the coordinates and other UWB readings to other threads
-    # proximity_pointer[0] passes the proximity sensor data acquired in a separate thread
-    sys_info = get_sys_info(serial_port)
-    tag_id = sys_info.get("device_id") 
-    upd_rate = sys_info.get("upd_rate") 
-    # type "lec\n" to the dwm shell console to activate data reporting
-    if not is_reporting_loc(t, timeout=upd_rate/10):        
-        serial_port.write(b'\x6C\x65\x63\x0D')
-        time.sleep(0.1)
-    assert is_reporting_loc(t, timeout=upd_rate/10)
+def report_uart_data(serial_port, uwb_pointer, proximity_pointer, init=True, tag_id=None):
+    """ uwb_pointer[0] is the pointer used to pass the coordinates and other UWB readings to other threads
+        proximity_pointer[0] passes the proximity sensor data acquired in a separate thread """
+    
+    # initialize the tag before reporting
+    # first return to non-reporting mode, to acquire system infomation and initialize accelerometer
+    if init:
+        from DWM1001_shell import dwm_cfg_tag_set_shell_acts, accelerometer_init_shell_av
+        dwm_cfg_tag_set_shell_acts(serial_port, loc_en=0, max_retrials=5, reset=True)
+        time.sleep(3)
+        accelerometer_init_shell_av(serial_port, max_retrials=5)
+        time.sleep(1)
+        sys_info = get_sys_info(serial_port)
+        tag_id = sys_info.get("device_id") 
+        upd_rate = sys_info.get("upd_rate") # upd_rate unit: multiples of 100ms
+        # type "lec\n" to the dwm shell console to activate data reporting
+        if not is_reporting_loc(serial_port, timeout=upd_rate*0.1*1.5):
+            dwm_cfg_tag_set_shell_acts(serial_port, loc_en=1, max_retrials=5, reset=True)
+            time.sleep(3)
+        assert is_reporting_loc(serial_port, timeout=upd_rate*0.1*1.5)
     
     # location data flow is confirmed. Start publishing to localhost (MQTT)
     sys.stdout.write(timestamp_log() + "Connecting to Broker...\n")
@@ -261,18 +284,22 @@ def report_uart_data(serial_port, uwb_pointer, proximity_pointer):
             json_dic['tag_id'] = tag_id
             json_dic['superFrameNumber'] = super_frame
             # pass in the proximity reading using proximity_pointer[0] pointer from proximity thread
-            json_dic['proximity'] = proximity_pointer[0] if proximity_pointer[0] is not None else "OutOfRange"
+            # json_dic['proximity'] = proximity_pointer[0] if proximity_pointer[0] is not None else "OutOfRange"
             json_data = json.dumps(json_dic)
             tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
             super_frame += 1
             # pass out coordinates using uwb_pointer[0] pointer for other threads
-            uwb_pointer[0] = json_dic
+            # uwb_pointer[0] = json_dic
         except Exception as exp:
             data = str(serial_port.readline(), encoding="UTF-8").rstrip()
             sys.stdout.write(timestamp_log() + data)
             raise exp
 
 if __name__ == "__main__":
+
+    from proximity_sensor import proximity_init, proximity_start
+    from lcd import lcd_init, lcd_disp
+    
     sys.stdout.write(timestamp_log() + "MQTT publisher service started. PID: {}\n".format(os.getpid()))
     com_ports = get_tag_serial_port()
     tagport = com_ports.pop()
@@ -363,5 +390,3 @@ if __name__ == "__main__":
     except BaseException as e:
         sys.stdout.write(timestamp_log() + "Reporting process failed. \n")
         raise e
-
-     

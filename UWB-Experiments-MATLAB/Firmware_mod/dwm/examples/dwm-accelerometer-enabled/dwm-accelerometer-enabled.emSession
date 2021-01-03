@@ -40,8 +40,8 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="840" useTextEdit="1" openedFrom="C:/Users/wangz/Documents/GitHub/DMW1001_firmware/DWM1001_on_board_package_R2.0/dwm/examples/dwm-simple/dwm-simple.c" useBinaryEdit="0" left="0" path="../../include/dwm.h" selected="0" top="815" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="44" useTextEdit="1" openedFrom="" useBinaryEdit="0" left="0" path="../../../../../../DMW1001_firmware/DWM1001_on_board_package_R2.0/dwm/examples/dwm-simple/dwm-simple.c" selected="1" top="34" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="187" useTextEdit="1" openedFrom="C:/Users/wangz/Documents/GitHub/DMW1001_firmware/DWM1001_on_board_package_R2.0/dwm/examples/dwm-simple/dwm-simple.c" useBinaryEdit="0" left="0" path="../../include/dwm.h" selected="0" top="174" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="211" useTextEdit="1" openedFrom="" useBinaryEdit="0" left="0" path="../../../../../../DMW1001_firmware/DWM1001_on_board_package_R2.0/dwm/examples/dwm-simple/dwm-simple.c" selected="1" top="191" codecName="Default"/>
  </Files>
- <ARMCrossStudioWindow activeProject="dwm-accelerometer-enabled" fileDialogDefaultFilter="" autoConnectTarget="J-Link" buildConfiguration="dwm1001_configuration" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="C:/Users/wangz/Documents/GitHub/UWB-MATLAB-code/UWB-Experiments-MATLAB/Firmware_mod/dwm/examples/dwm-accelerometer-enabled" debugSearchPath="" autoConnectCapabilities="3199"/>
+ <ARMCrossStudioWindow activeProject="dwm-accelerometer-enabled" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="dwm1001_configuration" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="C:/Users/wangz/Documents/GitHub/UWB-MATLAB-code/UWB-Experiments-MATLAB/Firmware_mod/dwm/examples/dwm-accelerometer-enabled" debugSearchPath="" autoConnectCapabilities="3199"/>
 </session>
