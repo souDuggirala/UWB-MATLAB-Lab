@@ -55,6 +55,8 @@ maze_data = ( ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
               ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
               ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
 
+anchor_list = [('C584',0.37,0.20,0.78), ('DA36',0.21,3.35,1.29), ('9234',2.95,2.78,1.18), ('8287',2.69,0.36,0.66)] # unit in m
+anchor_list = [('C584',37,20,78), ('DA36',21,335,129), ('9234',295,278,118), ('8287',269,36,66)] # unit in cm
 PARTICLE_COUNT = 2000    # Total number of particles
 
 ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
@@ -73,14 +75,14 @@ def add_noise(level, *coords):
     return [x + random.uniform(-level, level) for x in coords]
 
 def add_little_noise(*coords):
-    return add_noise(0.02, *coords)
+    return add_noise(5, *coords)
 
 def add_some_noise(*coords):
-    return add_noise(0.1, *coords)
+    return add_noise(10, *coords)
 
 # This is just a gaussian kernel I pulled out of my hat, to transform
 # values near to robbie's measurement => 1, further away => 0
-sigma = 0.9
+sigma = 0.3
 sigma2 = sigma ** 2
 def w_gauss(a, b):
     error = a - b
@@ -105,7 +107,7 @@ def w_gauss_multi(a: List, b: List) -> float:
 
 
 # ------------------------------------------------------------------------
-def compute_mean_point(particles):
+def compute_mean_point(world, particles):
     """
     Compute the mean for all particles that have a reasonably good weight.
     This is not part of the particle filter algorithm but rather an
@@ -128,7 +130,7 @@ def compute_mean_point(particles):
     # actually are in the immediate vicinity
     m_count = 0
     for p in particles:
-        if world.euclidean_dist(p.x, p.y, m_x, m_y) < 1:
+        if world.euclidean_dist(p.x, p.y, m_x, m_y) < 25:
             m_count += 1
 
     return m_x, m_y, m_count > PARTICLE_COUNT * 0.95
@@ -206,7 +208,7 @@ class Particle(object):
         h = self.h
         if noisy:
             speed, h = add_little_noise(speed, h)
-            h += random.uniform(-3, 3) # needs more noise to disperse better
+            h += random.uniform(-20, 20) # needs more noise to disperse better
         r = math.radians(h)
         dx = math.sin(r) * speed
         dy = math.cos(r) * speed
@@ -221,7 +223,7 @@ class Particle(object):
 
 # ------------------------------------------------------------------------
 class Robot(Particle):
-    speed = 0.5
+    speed = 15
 
     def __init__(self, maze):
         super(Robot, self).__init__(*maze.random_free_place(), heading=90)
@@ -265,13 +267,13 @@ class Robot(Particle):
 
 # ------------------------------------------------------------------------
 if __name__ == "__main__":
-    RANDOM_LOSS = True
-    world = Maze(maze_data)
+    RANDOM_LOSS = False
+    world = Maze(maze_data, anc_list=anchor_list)
 
     # initial distribution assigns each particle an equal probability
     particles = Particle.create_random_particles(PARTICLE_COUNT, world)
     robbie = Robot(world)
-
+    
     while True:
         # Read robbie's sensor
         # Only one raning result from one anchor is used. 
@@ -287,6 +289,7 @@ if __name__ == "__main__":
         #     else:
         #         p.w = 0
         # time.sleep(0.5)
+        all_x, all_y = [p.x for p in particles], [p.y for p in particles]
         if not RANDOM_LOSS:
             r_ds = robbie.read_sensors(world)
             for p in particles:
@@ -295,6 +298,7 @@ if __name__ == "__main__":
                     p.w = w_gauss_multi(r_ds, p_ds)
                 else:
                     p.w = 0
+            chosen_idx = [range(len(r_ds))]
         else:
             r_ds = robbie.read_sensors(world)
             chosen_idx = random.sample(range(len(r_ds)), random.randint(0, len(r_ds)))
@@ -307,12 +311,12 @@ if __name__ == "__main__":
                         p_ds[i] = float('inf')
                     new_weight = w_gauss_multi(r_ds, p_ds)
                     if new_weight:
-                        p.w = w_gauss_multi(r_ds, p_ds)
+                        p.w = new_weight
                 else:
                     p.w = 0
 
         # ---------- Try to find current best estimate for display ----------
-        m_x, m_y, m_confident = compute_mean_point(particles)
+        m_x, m_y, m_confident = compute_mean_point(world, particles)
 
         # ---------- Show current state ----------
         world.draw(chosen_idx)

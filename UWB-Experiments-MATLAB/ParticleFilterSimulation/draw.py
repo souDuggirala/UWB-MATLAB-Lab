@@ -8,41 +8,55 @@
 
 import math
 import turtle
+
 import random
 import time
 
 from typing import (Dict, List, Tuple, Set)
 
-turtle.tracer(50000, delay=0)
+turtle.tracer(0, delay=0)
 turtle.register_shape("dot", ((-3,-3), (-3,3), (3,3), (3,-3)))
 turtle.register_shape("tri", ((-3, -2), (0, 3), (3, -2), (0, 0)))
-turtle.speed(0)
+turtle.speed(10)
+turtle.setworldcoordinates(0, 0, 350, 350)
 turtle.title("Poor robbie is lost")
-
 UPDATE_EVERY = 0
-DRAW_EVERY = 2
+DRAW_EVERY = 20
 
 class Maze(object):
-    def __init__(self, maze_matrix, block_width=0.5):
-        self.maze = maze_matrix
-        self.width   = len(maze_matrix[0])
-        self.height  = len(maze_matrix)
+    def __init__(self, maze_matrix, anc_list=None, block_width=5):
         self.block_witdh = block_width
-        turtle.setworldcoordinates(0, 0, self.width, self.height)
-        self.blocks = []
         self.update_cnt = 0
-        self.one_px = float(turtle.window_width()) / float(self.width) / 2
+        self.blocks = []
         self.beacons = []
-        for y, line in enumerate(self.maze):
-            for x, block in enumerate(line):
-                if block:
-                    nb_y = self.height - y - self.block_witdh
-                    # (x, nb_y) is the lower-left corner of the block
-                    self.blocks.append((x, nb_y))
-                    if block == 2: # one at each corner
-                        self.beacons.extend(((x, nb_y), (x+1, nb_y), (x, nb_y+1), (x+1, nb_y+1)))
-                    if block == 3: # one at center only
-                        self.beacons.append((x + self.block_witdh/2, nb_y + self.block_witdh/2))
+    
+        if not anc_list:
+            self.maze = maze_matrix
+            self.width   = len(maze_matrix[0])
+            self.height  = len(maze_matrix)
+            turtle.setworldcoordinates(0, 0, self.width, self.height)
+            for y, line in enumerate(self.maze):
+                for x, block in enumerate(line):
+                    if block:
+                        nb_y = self.height - y - self.block_witdh
+                        # (x, nb_y) is the lower-left corner of the block
+                        self.blocks.append((x, nb_y))
+                        if block == 2: # one at each corner
+                            self.beacons.extend(((x, nb_y), (x+1, nb_y), (x, nb_y+1), (x+1, nb_y+1)))
+                        if block == 3: # one at center only
+                            self.beacons.append((x + self.block_witdh/2, nb_y + self.block_witdh/2))
+            self.anchor_x_list, self.anchor_y_list = [b[0] for b in self.beacons], [b[1] for b in self.beacons]
+        else:
+            self.maze = None
+            self.anchor_x_list = [anc[1] for anc in anc_list]
+            self.anchor_y_list = [anc[2] for anc in anc_list]
+            self.width = max(self.anchor_x_list) - min(self.anchor_x_list)
+            self.height = max(self.anchor_y_list) - min(self.anchor_y_list)
+            for anc in anc_list:
+                self.beacons.append((anc[1], anc[2]))
+                self.blocks.append((anc[1]-self.block_witdh/2, anc[2]-self.block_witdh/2))
+        self.one_px = float(turtle.window_width()) / float(self.width) / 0.002
+        print(turtle.window_width())
 
     def draw(self, lost_beacons):
         # draw the blocks of the maze
@@ -64,16 +78,16 @@ class Maze(object):
             x, y = self.beacons[i]
             turtle.setposition(x, y)
             if i in lost_beacons:
-                turtle.dot(20, 'white')
+                turtle.dot(8, 'white')
             else:
-                turtle.dot(20, 'red')
+                turtle.dot(8, 'red')
         turtle.stamp()
 
     def weight_to_color(self, weight):
         return "#%02x00%02x" % (int(weight * 255), int((1 - weight) * 255))
 
     def is_in(self, x, y):
-        if x < 0 or y < 0 or x > self.width or y > self.height:
+        if x < min(self.anchor_x_list) or y < min(self.anchor_y_list) or x > max(self.anchor_x_list) or y > max(self.anchor_y_list):
             return False
         return True
 
@@ -83,7 +97,9 @@ class Maze(object):
 
         yy = self.height - int(y) - 1
         xx = int(x)
-        return self.maze[yy][xx] == 0
+        if self.maze:
+            return self.maze[yy][xx] == 0
+        return True
 
         # 0 - empty square
         # 1 - occupied square
