@@ -46,18 +46,18 @@ maze_data = ( ( 1, 1, 0, 0, 2, 0, 0, 0, 0, 1 ),
                ( 0, 0, 0, 0, 1, 0, 0, 0, 1, 0 ),
                ( 0, 0, 1, 0, 0, 2, 1, 1, 1, 0 ))
 
-"""
-#maze_data = ( ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
-#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#              ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
-"""
+'''
+maze_data = ( ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
+              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+              ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
+'''
 
 PARTICLE_COUNT = 2000    # Total number of particles
 
@@ -270,6 +270,7 @@ class Robot(Particle):
 # ------------------------------------------------------------------------
 if __name__ == "__main__":
     RANDOM_LOSS = True
+    MAX_DIST = 5
     world = Maze(maze_data)
 
     # initial distribution assigns each particle an equal probability
@@ -292,7 +293,31 @@ if __name__ == "__main__":
         #         p.w = 0
         # time.sleep(0.5)
         chosen_idx = []
+        r_ds = robbie.read_sensors(world)
+        
+        if MAX_DIST >= 0:
+            for i in range(len(r_ds)):
+                if r_ds[i]>MAX_DIST:
+                    chosen_idx.append(i)
 
+        if RANDOM_LOSS:
+            random_idx = random.sample([i for i in range(len(r_ds)) if i not in chosen_idx], random.randint(0, len(r_ds) - len(chosen_idx))) #returns a list of random anchors to turn unusable
+            chosen_idx.extend(random_idx)
+
+        for i in chosen_idx:
+            r_ds[i] = float('inf')
+        for p in particles:
+            if world.is_free(*p.xy):
+                p_ds = p.read_sensors(world)
+                for i in chosen_idx:
+                    p_ds[i] = float('inf')
+                new_weight = w_gauss_multi(r_ds, p_ds)
+                if new_weight:
+                    p.w = new_weight
+            else:
+                p.w = 0
+
+        '''
         if not RANDOM_LOSS:
             r_ds = robbie.read_sensors(world)
             for p in particles:
@@ -316,6 +341,8 @@ if __name__ == "__main__":
                         p.w = new_weight
                 else:
                     p.w = 0
+        '''
+
 
         # ---------- Try to find current best estimate for display ----------
         m_x, m_y, m_confident = compute_mean_point(particles)
