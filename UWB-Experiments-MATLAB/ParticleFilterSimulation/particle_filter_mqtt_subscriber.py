@@ -13,20 +13,21 @@ def on_connect(client, userdata, flags, rc):
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    global mqtt_data, spd_window_size, last_uwb_pos
-    last_mqtt_data = mqtt_data[0]
-    mqtt_data[0] = json.loads(msg.payload.decode("utf-8"))
-    if 'est_pos' in mqtt_data[0].keys():
+    global mqtt_data, spd_window_size, last_uwb_pos, new_uwb_pos_semaphore
+    prev_mqtt_data = mqtt_data
+    mqtt_data = json.loads(msg.payload.decode("utf-8"))
+    if 'est_pos' in mqtt_data.keys():
         prev_uwb_pos = last_uwb_pos
-        last_uwb_pos = [mqtt_data[0]['est_pos'],  time.time()]
-        curr_x, curr_y = mqtt_data[0]['est_pos']['x'], mqtt_data[0]['est_pos']['y']
-        if last_mqtt_data:
-            prev_x, prev_y = last_mqtt_data['est_pos']['x'], last_mqtt_data['est_pos']['y']
+        new_uwb_pos_semaphore = True
+        last_uwb_pos = [mqtt_data['est_pos'],  time.time()]
+        curr_x, curr_y = mqtt_data['est_pos']['x'], mqtt_data['est_pos']['y']
+        if prev_mqtt_data:
+            prev_x, prev_y = prev_mqtt_data['est_pos']['x'], prev_mqtt_data['est_pos']['y']
             displacement = math.sqrt((curr_x - prev_x) ** 2 + (curr_y - prev_y) ** 2)
             if prev_uwb_pos:
                 time_diff = last_uwb_pos[1] - prev_uwb_pos[1]
                 if time_diff > 0:
-                    differential_spd = displacement / time_diff
+                    differential_spd = displacement / time_diff * 100   # unit in cm
                     if len(speed_window) < spd_window_size:
                         speed_window.append(differential_spd)
                     else:
@@ -50,14 +51,17 @@ def parse_ranging(chosen_idx, json_dict):
 def particle_anchor_ranging(chosen_idx, json_dict, particle):
     ret = []
     for anc in chosen_idx:
-        anc_x, anc_y = json_dict[anc]['x'], json_dict[anc]['y']
-        ret.append(math.sqrt((anc_x - particle.x) ** 2 + (anc_y - particle.y) ** 2))
+        anc_dict = json_dict.get(anc, None)
+        if anc_dict:
+            anc_x, anc_y = anc_dict['x'], anc_dict['y']
+            ret.append(math.sqrt((anc_x - particle.x) ** 2 + (anc_y - particle.y) ** 2))
     return ret
-    
-mqtt_data = [None]
+
+mqtt_data = None
 speed_window = []
 spd_window_size = 10
 last_uwb_pos = None
+new_uwb_pos_semaphore = False
 
 client = mqtt.Client()
 client.on_connect = on_connect
@@ -84,35 +88,28 @@ while True:
     # for particles and adjust particle weights accordingly. 
     # Update particle weight according to how good every particle matches
     # robbie's sensor reading
-    # r_d = robbie.read_nearest_sensor(world)
-    # for p in particles:
-    #     if world.is_free(*p.xy):
-    #         p_d = p.read_nearest_sensor(world)
-    #         p.w = w_gauss(r_d, p_d)
-    #     else:
-    #         p.w = 0
-    # time.sleep(0.5)
-    if not mqtt_data[0]:
+    if not mqtt_data:
         continue
-    chosen_idx = parse_anchor_idx(mqtt_data[0])
-    r_ds = parse_ranging(chosen_idx, mqtt_data[0])  # unit in m
+    chosen_idx = parse_anchor_idx(mqtt_data)
+    r_ds = parse_ranging(chosen_idx, mqtt_data)  # unit in m
     r_ds = [i*100 for i in r_ds]                    # convert unit to cm
     for p in particles:
         if world.is_free(*p.xy):
-            p_ds = particle_anchor_ranging(chosen_idx, mqtt_data[0], p)
+            p_ds = particle_anchor_ranging(chosen_idx, mqtt_data, p)
             new_weight = w_gauss_multi(r_ds, p_ds)
             if new_weight:
                 p.w = new_weight
         else:
             p.w = 0
-
     # ---------- Try to find current best estimate for display ----------
-    m_x, m_y, m_confident = compute_mean_point(world, particles)
-
+    m_x, m_y, confidence_indicator = compute_mean_point(world, particles, dist_threshold=25)
+    if new_uwb_pos_semaphore:
+        robbie.x, robbie.y = last_uwb_pos[0]['x']*100, last_uwb_pos[0]['y']*100 #unit in cm
+        new_uwb_pos_semaphore = False
     # ---------- Show current state ----------
     world.draw(chosen_idx)
     world.show_particles(particles)
-    world.show_mean(m_x, m_y, m_confident)
+    world.show_mean(m_x, m_y, confidence_indicator)
     world.show_robot(robbie)
     # ---------- Shuffle particles ----------
     new_particles = []
@@ -131,22 +128,17 @@ while True:
         if p is None:  # No pick b/c all totally improbable
             new_particle = Particle.create_random_particles(1, world)[0]
         else:
-            new_particle = Particle(p.x, p.y,
-                    heading=robbie.h if ROBOT_HAS_COMPASS else p.h,
-                    noisy=True)
+            new_particle = Particle(p.x, p.y, noisy=True)
         new_particles.append(new_particle)
 
     particles = new_particles
-
+    if speed_window:
+        robbie.speed = sum(speed_window) / len(speed_window)
     # ---------- Move things ----------
-    old_heading = robbie.h
-    robbie.move(world)
-    d_h = robbie.h - old_heading
-
+    robbie.move(world, speed=robbie.speed, delta_t=1)
     # Move particles according to my belief of movement (this may
     # be different than the real movement, but it's all I got)
     for p in particles:
-        p.h += d_h # in case robot changed heading, swirl particle heading too
         p.advance_by(robbie.speed)
 
 # Blocking call that processes network traffic, dispatches callbacks and

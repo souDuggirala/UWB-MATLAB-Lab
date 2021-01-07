@@ -82,7 +82,7 @@ def add_some_noise(*coords):
 
 # This is just a gaussian kernel I pulled out of my hat, to transform
 # values near to robbie's measurement => 1, further away => 0
-sigma = 0.3
+sigma = 5
 sigma2 = sigma ** 2
 def w_gauss(a, b):
     error = a - b
@@ -98,7 +98,8 @@ def w_gauss_multi(a: List, b: List) -> float:
     assert len(a) == len(b)
     dim = len(a)
     if dim > 0:
-        error = a - b
+        error = (a - b)
+        error = error.reshape(1,dim)
         mean = np.zeros(dim, float)
         cov = np.zeros((dim,dim), float)
         np.fill_diagonal(cov, sigma2)
@@ -107,7 +108,7 @@ def w_gauss_multi(a: List, b: List) -> float:
 
 
 # ------------------------------------------------------------------------
-def compute_mean_point(world, particles):
+def compute_mean_point(world, particles, dist_threshold=25):
     """
     Compute the mean for all particles that have a reasonably good weight.
     This is not part of the particle filter algorithm but rather an
@@ -130,7 +131,7 @@ def compute_mean_point(world, particles):
     # actually are in the immediate vicinity
     m_count = 0
     for p in particles:
-        if world.euclidean_dist(p.x, p.y, m_x, m_y) < 25:
+        if world.euclidean_dist(p.x, p.y, m_x, m_y) < dist_threshold:
             m_count += 1
 
     return m_x, m_y, m_count > PARTICLE_COUNT * 0.95
@@ -204,18 +205,18 @@ class Particle(object):
         #         readings[i] = float('inf')
         #     return readings
 
-    def advance_by(self, speed, checker=None, noisy=False):
+    def advance_by(self, speed, delta_t=1, checker=None, noisy=False):
         h = self.h
         if noisy:
             speed, h = add_little_noise(speed, h)
-            h += random.uniform(-20, 20) # needs more noise to disperse better
+            h += random.uniform(-15, 15) # needs more noise to disperse better
         r = math.radians(h)
-        dx = math.sin(r) * speed
-        dy = math.cos(r) * speed
-        if checker is None or checker(self, dx, dy):
-            self.move_by(dx, dy)
-            return True
-        return False
+        dx = math.sin(r) * speed * delta_t
+        dy = math.cos(r) * speed * delta_t
+        # if checker is None or checker(self, dx, dy):
+        #     self.move_by(dx, dy)
+        #     return True
+        # return False
 
     def move_by(self, x, y):
         self.x += x
@@ -223,7 +224,7 @@ class Particle(object):
 
 # ------------------------------------------------------------------------
 class Robot(Particle):
-    speed = 15
+    speed = 0
 
     def __init__(self, maze):
         super(Robot, self).__init__(*maze.random_free_place(), heading=90)
@@ -252,18 +253,18 @@ class Robot(Particle):
         """
         return add_little_noise(super(Robot, self).read_sensors(maze))
 
-    def move(self, maze):
+    def move(self, maze, speed, delta_t):
         """
         Move the robot. Note that the movement is stochastic too.
         """
-        while True:
-            self.step_count += 1
-            if self.advance_by(self.speed, noisy=True,
-                checker=lambda r, dx, dy: maze.is_free(r.x+dx, r.y+dy)):
-                break
+        self.step_count += 1
+        self.advance_by(self.speed, delta_t=1, noisy=True, checker=None)
+        # while True:
+            # if self.advance_by(self.speed, delta_t=1, noisy=True,checker=lambda r, dx, dy: maze.is_free(r.x+dx, r.y+dy)):
+            #     break
             # Bumped into something or too long in same direction,
             # chose random new direction
-            self.chose_random_direction()
+            # self.chose_random_direction()
 
 # ------------------------------------------------------------------------
 if __name__ == "__main__":

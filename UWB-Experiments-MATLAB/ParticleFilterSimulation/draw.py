@@ -21,7 +21,7 @@ turtle.speed(10)
 turtle.setworldcoordinates(0, 0, 350, 350)
 turtle.title("Poor robbie is lost")
 UPDATE_EVERY = 0
-DRAW_EVERY = 20
+DRAW_EVERY = 10
 
 class Maze(object):
     def __init__(self, maze_matrix, anc_list=None, block_width=5):
