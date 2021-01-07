@@ -21,7 +21,7 @@ turtle.speed(10)
 turtle.setworldcoordinates(0, 0, 350, 350)
 turtle.title("Poor robbie is lost")
 UPDATE_EVERY = 0
-DRAW_EVERY = 10
+DRAW_EVERY = 2
 
 class Maze(object):
     def __init__(self, maze_matrix, anc_list=None, block_width=5):
@@ -56,7 +56,6 @@ class Maze(object):
                 self.beacons.append((anc[1], anc[2]))
                 self.blocks.append((anc[1]-self.block_witdh/2, anc[2]-self.block_witdh/2))
         self.one_px = float(turtle.window_width()) / float(self.width) / 0.002
-        print(turtle.window_width())
 
     def draw(self, lost_beacons):
         # draw the blocks of the maze
