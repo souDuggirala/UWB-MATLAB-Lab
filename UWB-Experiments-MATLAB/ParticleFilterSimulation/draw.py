@@ -35,6 +35,7 @@ class Maze(object):
             self.width   = len(maze_matrix[0])
             self.height  = len(maze_matrix)
             turtle.setworldcoordinates(0, 0, self.width, self.height)
+            cnt = 0
             for y, line in enumerate(self.maze):
                 for x, block in enumerate(line):
                     if block:
@@ -42,22 +43,27 @@ class Maze(object):
                         # (x, nb_y) is the lower-left corner of the block
                         self.blocks.append((x, nb_y))
                         if block == 2: # one at each corner
-                            self.beacons.extend(((x, nb_y), (x+1, nb_y), (x, nb_y+1), (x+1, nb_y+1)))
+                            self.beacons.extend(((str(cnt+1), x, nb_y, float('inf')), 
+                                                (str(cnt+2), x+1, nb_y, float('inf')), 
+                                                (str(cnt+3), x, nb_y+1, float('inf')), 
+                                                (str(cnt+4), x+1, nb_y+1, float('inf'))))
+                            cnt += 4
                         if block == 3: # one at center only
-                            self.beacons.append((x + self.block_witdh/2, nb_y + self.block_witdh/2))
-            self.anchor_x_list, self.anchor_y_list = [b[0] for b in self.beacons], [b[1] for b in self.beacons]
+                            self.beacons.append((str(cnt+1), x + self.block_witdh/2, nb_y + self.block_witdh/2, float('inf')))
+                            cnt += 1
+            self.anchor_x_list, self.anchor_y_list = [b[1] for b in self.beacons], [b[2] for b in self.beacons]
         else:
             self.maze = None
             self.anchor_x_list = [anc[1] for anc in anc_list]
             self.anchor_y_list = [anc[2] for anc in anc_list]
             self.width = max(self.anchor_x_list) - min(self.anchor_x_list)
             self.height = max(self.anchor_y_list) - min(self.anchor_y_list)
+            self.beacons = anc_list
             for anc in anc_list:
-                self.beacons.append((anc[1], anc[2]))
                 self.blocks.append((anc[1]-self.block_witdh/2, anc[2]-self.block_witdh/2))
         self.one_px = float(turtle.window_width()) / float(self.width) / 0.002
 
-    def draw(self, lost_beacons):
+    def draw(self, selected_beacons):
         # draw the blocks of the maze
         turtle.color("#000000")
         for x, y in self.blocks:
@@ -72,11 +78,11 @@ class Maze(object):
             turtle.end_fill()
             turtle.up()
 
-        # draw the beacons/anchors
+        # draw the beacons/anchorsc
         for i in range(len(self.beacons)):
-            x, y = self.beacons[i]
+            x, y = self.beacons[i][1],self.beacons[i][2]
             turtle.setposition(x, y)
-            if i in lost_beacons:
+            if self.beacons[i][0] in selected_beacons:
                 turtle.dot(8, 'white')
             else:
                 turtle.dot(8, 'red')
@@ -93,7 +99,7 @@ class Maze(object):
     def is_free(self, x, y):
         if not self.is_in(x, y):
             return False
-
+        
         yy = self.height - int(y) - 1
         xx = int(x)
         if self.maze:
@@ -163,7 +169,8 @@ class Maze(object):
 
     def distance_to_nearest_beacon(self, x, y) -> float:
         d = float('inf')
-        for c_x, c_y in self.beacons:
+        for i in range(len(self.beacons)):
+            c_x, c_y = self.beacons[i][1], self.beacons[i][2]
             distance = self.euclidean_dist(c_x, c_y, x, y)
             if distance < d:
                 d = distance
@@ -172,6 +179,7 @@ class Maze(object):
     
     def distances_to_all_beacons(self, x, y) -> Tuple:
         dist = []
-        for c_x, c_y in self.beacons:
+        for i in range(len(self.beacons)):
+            c_x, c_y = self.beacons[i][1], self.beacons[i][2]
             dist.append(self.euclidean_dist(c_x, c_y, x, y))
         return dist

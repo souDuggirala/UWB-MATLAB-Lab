@@ -19,52 +19,6 @@ from draw import Maze
 
 import time
 
-"""
-# Smaller maze
-
-maze_data = ( ( 2, 0, 1, 0, 0 ),
-              ( 0, 0, 0, 0, 1 ),
-              ( 1, 1, 1, 0, 0 ),
-              ( 1, 0, 0, 0, 0 ),
-              ( 0, 0, 2, 0, 1 ))
-"""
-
-# 0 - empty square
-# 1 - occupied square
-# 2 - occupied square with a beacon at center, detectable by the robot
-
-# maze_data = ( ( 1, 1, 0, 0, 2, 0, 0, 0, 0, 1 ),
-#               ( 1, 2, 0, 0, 1, 1, 0, 0, 0, 0 ),
-#               ( 0, 1, 1, 0, 0, 0, 0, 1, 0, 1 ),
-#               ( 0, 0, 0, 0, 1, 0, 0, 1, 1, 2 ),
-#               ( 1, 1, 0, 1, 1, 2, 0, 0, 1, 0 ),
-#               ( 1, 1, 1, 0, 1, 1, 1, 0, 2, 0 ),
-#               ( 2, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-#               ( 1, 2, 0, 1, 1, 1, 1, 0, 0, 0 ),
-#               ( 0, 0, 0, 0, 1, 0, 0, 0, 1, 0 ),
-#               ( 0, 0, 1, 0, 0, 2, 1, 1, 1, 0 ))
-
-maze_data = ( ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
-              ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
-
-anchor_list = [('C584',0.37,0.20,0.78), ('DA36',0.21,3.35,1.29), ('9234',2.95,2.78,1.18), ('8287',2.69,0.36,0.66)] # unit in m
-anchor_list = [('C584',37,20,78), ('DA36',21,335,129), ('9234',295,278,118), ('8287',269,36,66)] # unit in cm
-PARTICLE_COUNT = 2000    # Total number of particles
-
-ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
-# makes orientation a lot easier since it knows which direction it is facing.
-# If not -- and that is really fascinating -- the particle filter can work
-# out its heading too, it just takes more particles and more time. Try this
-# with 3000+ particles, it obviously needs lots more hypotheses as a particle
-# now has to correctly match not only the position but also the heading.
 
 # ------------------------------------------------------------------------
 # Some utility functions
@@ -75,14 +29,15 @@ def add_noise(level, *coords):
     return [x + random.uniform(-level, level) for x in coords]
 
 def add_little_noise(*coords):
-    return add_noise(5, *coords)
+    return add_noise(0.02, *coords)
 
 def add_some_noise(*coords):
-    return add_noise(10, *coords)
+    return add_noise(0.1, *coords)
+
 
 # This is just a gaussian kernel I pulled out of my hat, to transform
 # values near to robbie's measurement => 1, further away => 0
-sigma = 5
+sigma = 0.9
 sigma2 = sigma ** 2
 def w_gauss(a, b):
     error = a - b
@@ -109,9 +64,8 @@ def w_gauss_multi(a: List, b: List) -> float:
         g = multivariate_normal.pdf(x=error, mean=mean, cov=cov)
         return g
 
-
 # ------------------------------------------------------------------------
-def compute_mean_point(world, particles, dist_threshold=25):
+def compute_mean_point(world, particles, dist_threshold=1):
     """
     Compute the mean for all particles that have a reasonably good weight.
     This is not part of the particle filter algorithm but rather an
@@ -212,7 +166,7 @@ class Particle(object):
         h = self.h
         if noisy:
             speed, h = add_little_noise(speed, h)
-            h += random.uniform(-15, 15) # needs more noise to disperse better
+            h += random.uniform(-3, 3) # needs more noise to disperse better
         r = math.radians(h)
         dx = math.sin(r) * speed * delta_t
         dy = math.cos(r) * speed * delta_t
@@ -227,7 +181,7 @@ class Particle(object):
 
 # ------------------------------------------------------------------------
 class Robot(Particle):
-    speed = 15
+    speed = 0
 
     def __init__(self, maze):
         super(Robot, self).__init__(*maze.random_free_place(), heading=90)
@@ -262,7 +216,8 @@ class Robot(Particle):
         """
         self.step_count += 1
         while True:
-            if self.advance_by(self.speed, delta_t=1, noisy=True,checker=lambda r, dx, dy: maze.is_free(r.x+dx, r.y+dy)):
+            if self.advance_by(speed, delta_t=1, noisy=True,
+                        checker=lambda r, dx, dy: maze.is_free(r.x+dx, r.y+dy)):
                 break
             # Bumped into something or too long in same direction,
             # chose random new direction
@@ -270,8 +225,29 @@ class Robot(Particle):
 
 # ------------------------------------------------------------------------
 if __name__ == "__main__":
+    maze_data = (   ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
+                    ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+                    ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+                    ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+                    ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+                    ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+                    ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+                    ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+                    ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+                    ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
+    # 0 - empty square
+    # 1 - occupied square
+    # 2 - occupied square with a beacon at center, detectable by the robot
+    PARTICLE_COUNT = 2000    # Total number of particles
+
+    ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
+    # makes orientation a lot easier since it knows which direction it is facing.
+    # If not -- and that is really fascinating -- the particle filter can work
+    # out its heading too, it just takes more particles and more time. Try this
+    # with 3000+ particles, it obviously needs lots more hypotheses as a particle
+    # now has to correctly match not only the position but also the heading.
     RANDOM_LOSS = False
-    world = Maze(maze_data, anc_list=anchor_list)
+    world = Maze(maze_data, block_width=0.5)
 
     # initial distribution assigns each particle an equal probability
     particles = Particle.create_random_particles(PARTICLE_COUNT, world)
@@ -292,7 +268,6 @@ if __name__ == "__main__":
         #     else:
         #         p.w = 0
         # time.sleep(0.5)
-        all_x, all_y = [p.x for p in particles], [p.y for p in particles]
         if not RANDOM_LOSS:
             r_ds = robbie.read_sensors(world)
             for p in particles:
@@ -317,10 +292,8 @@ if __name__ == "__main__":
                         p.w = new_weight
                 else:
                     p.w = 0
-
         # ---------- Try to find current best estimate for display ----------
         m_x, m_y, m_confident = compute_mean_point(world, particles)
-
         # ---------- Show current state ----------
         world.draw(chosen_idx)
         world.show_particles(particles)
