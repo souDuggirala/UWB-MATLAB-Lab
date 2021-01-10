@@ -88,7 +88,7 @@ def compute_mean_point(world, particles, dist_threshold=1):
     # actually are in the immediate vicinity
     m_count = 0
     for p in particles:
-        if world.euclidean_dist(p.x, p.y, m_x, m_y) < dist_threshold:
+        if world.euclidean_dist_xy(p.x, p.y, m_x, m_y) < dist_threshold:
             m_count += 1
 
     return m_x, m_y, m_count > PARTICLE_COUNT * 0.95
@@ -115,15 +115,15 @@ class WeightedDistribution(object):
 
 # ------------------------------------------------------------------------
 class Particle(object):
-    def __init__(self, x, y, heading=None, w=1, noisy=False):
-        if heading is None:
-            heading = random.uniform(0, 360)
+    def __init__(self, x, y, z=0, yaw=None, w=1, noisy=False):
+        if yaw is None:
+            yaw = random.uniform(0, 360)
         if noisy:
-            x, y, heading = add_some_noise(x, y, heading)
+            x, y, yaw = add_some_noise(x, y, yaw)
 
         self.x = x
         self.y = y
-        self.h = heading
+        self.yaw = yaw
         self.w = w
 
     def __repr__(self):
@@ -132,10 +132,6 @@ class Particle(object):
     @property
     def xy(self):
         return self.x, self.y
-
-    @property
-    def xyh(self):
-        return self.x, self.y, self.h
 
     @classmethod
     def create_random_particles(cls, particle_count, maze):
@@ -163,7 +159,7 @@ class Particle(object):
         #     return readings
 
     def advance_by(self, speed, delta_t=1, checker=None, noisy=False):
-        h = self.h
+        h = self.yaw
         if noisy:
             speed, h = add_little_noise(speed, h)
             h += random.uniform(-3, 3) # needs more noise to disperse better
@@ -184,13 +180,13 @@ class Robot(Particle):
     speed = 0
 
     def __init__(self, maze):
-        super(Robot, self).__init__(*maze.random_free_place(), heading=90)
+        super(Robot, self).__init__(*maze.random_free_place(), yaw=90)
         self.chose_random_direction()
         self.step_count = 0
 
     def chose_random_direction(self):
-        heading = random.uniform(0, 360)
-        self.h = heading
+        yaw = random.uniform(0, 360)
+        self.yaw = yaw
 
     def read_nearest_sensor(self, maze):
         """
@@ -243,9 +239,9 @@ if __name__ == "__main__":
     ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
     # makes orientation a lot easier since it knows which direction it is facing.
     # If not -- and that is really fascinating -- the particle filter can work
-    # out its heading too, it just takes more particles and more time. Try this
+    # out its yaw too, it just takes more particles and more time. Try this
     # with 3000+ particles, it obviously needs lots more hypotheses as a particle
-    # now has to correctly match not only the position but also the heading.
+    # now has to correctly match not only the position but also the yaw.
     RANDOM_LOSS = False
     world = Maze(maze_data, block_width=0.5)
 
@@ -307,29 +303,37 @@ if __name__ == "__main__":
         if nu:
             for p in particles:
                 p.w = p.w / nu
-
+        print(min([p.w for p in particles]), max([p.w for p in particles]))
+        picked, generated = [], []
         # create a weighted distribution, for fast picking
         dist = WeightedDistribution(particles)
-
         for _ in particles:
             p = dist.pick()
             if p is None:  # No pick b/c all totally improbable
                 new_particle = Particle.create_random_particles(1, world)[0]
+                generated.append(new_particle)
             else:
                 new_particle = Particle(p.x, p.y,
-                        heading=robbie.h if ROBOT_HAS_COMPASS else p.h,
+                        yaw=robbie.yaw if ROBOT_HAS_COMPASS else p.yaw,
                         noisy=True)
+                picked.append(new_particle)
             new_particles.append(new_particle)
 
         particles = new_particles
-
+        print(r_ds, p_ds)
+        print("Robot speed: {}, picked particle: {}, generated particle: {}"
+                .format(robbie.speed, len(picked), len(generated)))
+        # print("particle x set: {} y set: {}".format(len(set([p.x for p in particles])), len(set([p.y for p in particles]))))
+        #print("particle x range: [{}-{}] y range: [{}-{}]"
+        #            .format(round(min([p.x for p in particles]),2), round(max([p.x for p in particles]),2), 
+        #                    round(min([p.y for p in particles]),2), round(max([p.y for p in particles]),2)))
         # ---------- Move things ----------
-        old_heading = robbie.h
-        robbie.move(world, speed=robbie.speed, delta_t=1)
-        d_h = robbie.h - old_heading
+        old_yaw = robbie.yaw
+        # robbie.move(world, speed=robbie.speed, delta_t=1)
+        d_h = robbie.yaw - old_yaw
 
         # Move particles according to my belief of movement (this may
         # be different than the real movement, but it's all I got)
         for p in particles:
-            p.h += d_h # in case robot changed heading, swirl particle heading too
+            # p.yaw += d_h # in case robot changed yaw, swirl particle yaw too
             p.advance_by(robbie.speed)
