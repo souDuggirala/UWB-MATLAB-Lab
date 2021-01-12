@@ -12,11 +12,19 @@ from typing import (Dict, List, Tuple, Set)
 import paho.mqtt.client as mqtt
 import json
 from draw import *
+import random
 import math
 import numpy as np
 from scipy.stats import multivariate_normal
 import bisect
 
+import time
+
+AXIAL_NOISE=5
+SPEED_NOISE=0.5
+AXIAL_NOISE_LARGE=0.1
+HEADING_NOISE, HEADING_RANGE = 5, [0, 360]
+PITCH_NOISE, PITCH_RANGE = 5, [-90, 90]
 
 # ------------------------------------------------------------------------
 # Some utility functions
@@ -28,19 +36,18 @@ def add_noise(level, range_lim, *coords):
         raw = [x + random.uniform(-level, level) for x in coords]
     if not range_lim:
         return raw
+    elif isinstance(raw, List):
+        for x in raw:
+            if x < range_lim[0]:
+                x = range_lim[0]
+            if x > range_lim[1]:
+                x = range_lim[1]
     else:
-        if isinstance(raw, List):
-            for x in raw:
-                if x < range_lim[0]:
-                    x = range_lim[0]
-                if x > range_lim[1]:
-                    x = range_lim[1]
-        else:
-            if raw < range_lim[0]:
-                raw = range_lim[0]
-            if raw > range_lim[1]:
-                raw = range_lim[1]
-        return raw
+        if raw < range_lim[0]:
+            raw = range_lim[0]
+        if raw > range_lim[1]:
+            raw = range_lim[1]
+    return raw
 
 # This is just a gaussian kernel I pulled out of my hat, to transform
 # values near to robbie's measurement => 1, further away => 0
@@ -126,20 +133,20 @@ class WeightedDistribution(object):
 
 # ------------------------------------------------------------------------
 class Particle(object):
-    def __init__(self, x, y, z=0, yaw=None, pitch=None, w=1, noisy=False):
-        if yaw is None:
-            yaw = random.uniform(0, 360)
+    def __init__(self, x, y, z=0, xy_heading=None, pitch=None, w=1, noisy=False):
+        if xy_heading is None:
+            xy_heading = random.uniform(HEADING_RANGE[0], HEADING_RANGE[1])
         if pitch is None:
-            pitch = random.uniform(-90, 90)
+            pitch = random.uniform(PITCH_RANGE[0], PITCH_RANGE[1])
         if noisy:
-            x, y, z = add_noise(5, [], x, y, z)
-            yaw = add_noise(5, [0, 360], yaw)
-            pitch = add_noise(5, [-90, 90], pitch)
+            x, y, z = add_noise(AXIAL_NOISE, [], x, y, z)
+            xy_heading = add_noise(HEADING_NOISE, HEADING_RANGE, xy_heading)
+            pitch = add_noise(PITCH_NOISE, PITCH_RANGE, pitch)
 
         self.x = x
         self.y = y
         self.z = z
-        self.yaw = yaw
+        self.xy_heading = xy_heading
         self.pitch = pitch
         self.w = w
 
@@ -149,6 +156,7 @@ class Particle(object):
     @property
     def xy(self):
         return self.x, self.y
+
     @property
     def xyz(self):
         return self.x, self.y, self.z
@@ -158,35 +166,39 @@ class Particle(object):
         return [cls(*maze.random_free_place()) for _ in range(0, particle_count)]
 
     def advance_by(self, speed, delta_t=1, checker=None, noisy=False):
-        yaw = self.yaw
+        xy_heading = self.xy_heading
+        pitch = self.pitch
         if noisy:
-            speed = add_noise(1, [], speed)
-            yaw = add_noise(5, [], yaw)
-            yaw += random.uniform(-3, 3) # needs more noise to disperse better
-        r = math.radians(yaw)        
-        dx = math.sin(r) * speed * delta_t
-        dy = math.cos(r) * speed * delta_t
-        if checker is None or checker(self, dx, dy):
-            self.move_by(dx, dy)
+            speed = add_noise(SPEED_NOISE, [], speed)
+            xy_heading = add_noise(HEADING_NOISE, HEADING_RANGE, xy_heading)
+            pitch = add_noise(PITCH_NOISE, PITCH_RANGE, pitch)
+        r, pitch_r = math.radians(xy_heading), math.radians(pitch)
+        speed_xy = math.cos(pitch_r)
+        dx = math.sin(r) * speed_xy * delta_t
+        dy = math.cos(r) * speed_xy * delta_t
+        dz = math.sin(pitch_r) * speed * delta_t
+        if checker is None or checker(self, dx, dy, dz):
+            self.move_by(dx, dy, dz)
             return True
         return False
 
-    def move_by(self, x, y):
+    def move_by(self, x, y, z):
         self.x += x
         self.y += y
+        self.z += z
 
 # ------------------------------------------------------------------------
 class Robot(Particle):
     speed = 0
 
     def __init__(self, maze):
-        super(Robot, self).__init__(*maze.random_free_place(), yaw=90)
+        super(Robot, self).__init__(*maze.random_free_place(), xy_heading=90)
         self.chose_random_direction()
         self.step_count = 0
 
     def chose_random_direction(self):
-        yaw = random.uniform(0, 360)
-        self.yaw = yaw
+        xy_heading = random.uniform(0, 360)
+        self.xy_heading = xy_heading
 
     def move(self, maze, speed, delta_t):
         """
@@ -261,7 +273,7 @@ if __name__ == '__main__':
     ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
     # makes orientation a lot easier since it knows which direction it is facing.
     # If not -- and that is really fascinating -- the particle filter can work
-    # out its yaw too, it just takes more particles and more time. 
+    # out its xy_heading too, it just takes more particles and more time. 
     mqtt_data = None
     speed_window = []
     spd_window_size = 10
@@ -335,7 +347,7 @@ if __name__ == '__main__':
                 new_particle = Particle.create_random_particles(1, world)[0]
                 generated.append(new_particle)
             else:
-                new_particle = Particle(p.x, p.y, p.z, yaw=None, noisy=True)
+                new_particle = Particle(p.x, p.y, p.z, xy_heading=None, noisy=True)
                 picked.append(new_particle)
             new_particles.append(new_particle)
 
@@ -349,17 +361,17 @@ if __name__ == '__main__':
                            round(min([p.z for p in particles]),2), round(max([p.z for p in particles]),2)))
         print("particle x: {} y: {} z: {}"
                    .format(round(m_x,2), round(m_y,2), round(m_z, 2)))
-        print("uwb x: {}, y: {}, z:{}".format(round(robbie.x,2), round(robbie.y, 2), round(robbie.z,2)))
+        print("uwb x: {}, y: {}, z: {}".format(round(robbie.x,2), round(robbie.y, 2), round(robbie.z,2)))
         if speed_window:
             robbie.speed = sum(speed_window) / len(speed_window)
         # ---------- Move things ----------
-        old_yaw = robbie.yaw
-        # robbie.move(world, speed=robbie.speed, delta_t=1)
-        d_yaw = robbie.yaw - old_yaw
+        old_xy_heading = robbie.xy_heading
+        robbie.move(world, speed=robbie.speed, delta_t=1)
+        d_xy_heading = robbie.xy_heading - old_xy_heading
         # Move particles according to my belief of movement (this may
         # be different than the real movement, but it's all I got)
         for p in particles:
-            p.yaw += d_yaw # in case robot changed yaw, swirl particle yaw too
+            p.xy_heading += d_xy_heading # in case robot changed xy_heading, swirl particle xy_heading too
             p.advance_by(robbie.speed)
     # Blocking call that processes network traffic, dispatches callbacks and
     # handles reconnecting.

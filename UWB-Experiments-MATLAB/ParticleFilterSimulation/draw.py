@@ -152,7 +152,7 @@ class Maze(object):
                 if not scaled_xy in px:
                     px[scaled_xy] = 1
                     turtle.setposition(*p.xy)
-                    turtle.setheading(90 - p.yaw)
+                    turtle.setheading(90 - p.xy_heading)
                     turtle.color(self.weight_to_color(p.w))
                     turtle.stamp()
 
@@ -160,7 +160,7 @@ class Maze(object):
         turtle.color("green")
         turtle.shape('turtle')
         turtle.setposition(*robot.xy)
-        turtle.setheading(90 - robot.yaw)
+        turtle.setheading(90 - robot.xy_heading)
         turtle.stamp()
         turtle.update()
 
