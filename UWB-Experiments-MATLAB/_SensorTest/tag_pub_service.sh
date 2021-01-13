@@ -1,7 +1,7 @@
 #!/bin/bash
 # starting the python publisher, with console standard output/errors
 # both stored in /home/pi/tag_pub_out.log
-PROCESS_NAME="tag_mqtt_publisher_proxi_sensor_lcd.py"
+PROCESS_NAME="tag_mqtt_publisher.py"
 while true;
 do
 	time=$(date "+%Y-%m-%d %H:%M:%S")
