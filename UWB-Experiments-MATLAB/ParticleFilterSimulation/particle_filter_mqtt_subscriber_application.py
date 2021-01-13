@@ -353,6 +353,7 @@ if __name__ == '__main__':
         if nu:
             for p in particles:
                 p.w = p.w / nu
+        # print(min([p.w for p in particles]), max([p.w for p in particles]))      
         picked, generated = [], []
         # create a weighted distribution, for fast picking
         dist = WeightedDistribution(particles)
@@ -367,23 +368,18 @@ if __name__ == '__main__':
             new_particles.append(new_particle)
 
         particles = new_particles
-        if speed_window:
-            robbie.speed = sum(speed_window) / len(speed_window)
-
-        # print(min([p.w for p in particles]), max([p.w for p in particles]))      
         # print(r_ds, p_ds)
         # print("Robot speed: {}, picked particle: {}, generated particle: {}"
         #         .format(robbie.speed, len(picked), len(generated)))
-        # print("particle x range: [{}-{}] y range: [{}-{}] z range: [{}-{}]"
-        #         .format(round(min([p.x for p in particles]),2), round(max([p.x for p in particles]),2), 
-        #                 round(min([p.y for p in particles]),2), round(max([p.y for p in particles]),2),
-        #                 round(min([p.z for p in particles]),2), round(max([p.z for p in particles]),2)))
-        # print("particle x: {} y: {} z: {}"
-        #         .format(round(m_x,2), round(m_y,2), round(m_z, 2)))
-        # print("uwb x: {}, y: {}, z: {}".format(round(robbie.x,2), round(robbie.y, 2), round(robbie.z,2)))
-
-
-
+        print("particle x range: [{}-{}] y range: [{}-{}] z range: [{}-{}]"
+                .format(round(min([p.x for p in particles]),2), round(max([p.x for p in particles]),2), 
+                        round(min([p.y for p in particles]),2), round(max([p.y for p in particles]),2),
+                        round(min([p.z for p in particles]),2), round(max([p.z for p in particles]),2)))
+        print("particle x: {} y: {} z: {}"
+                .format(round(m_x,2), round(m_y,2), round(m_z, 2)))
+        print("uwb x: {}, y: {}, z: {}".format(round(robbie.x,2), round(robbie.y, 2), round(robbie.z,2)))
+        if speed_window:
+            robbie.speed = sum(speed_window) / len(speed_window)
         # ---------- Move things ----------
         old_xy_heading = robbie.xy_heading
         robbie.move(world, speed=robbie.speed, delta_t=1)
