@@ -12,6 +12,7 @@ from typing import (Dict, List, Tuple, Set)
 import paho.mqtt.client as mqtt
 import json
 from draw import *
+from plot_3d import ProcessPlotter, NBPlot
 import random
 import math
 import numpy as np
@@ -19,6 +20,12 @@ from scipy.stats import multivariate_normal
 import bisect
 
 import time
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import multiprocessing as mp
+import time
+
 
 AXIAL_NOISE=5
 SPEED_NOISE=0.5
@@ -266,6 +273,35 @@ def particle_anchor_ranging(selected_anc, json_dict, particle):
             ret.append(float('inf'))
     return ret
 
+def plot_3d(self, selected_anc, particles, robbie, mean_point_data):
+        # https://stackoverflow.com/questions/34764535/why-cant-matplotlib-plot-in-a-different-thread
+        (m_x, m_y, m_z, confidence_indicator) = mean_point_data
+        def plot_anchors(ax, selected_anc):
+            for i in range(len(self.beacons)):
+                x, y, z = self.beacons[i][1],self.beacons[i][2],self.beacons[i][3]
+                if self.beacons[i][0] in selected_anc:
+                    ax.plot(x, y, z, 'wo')
+                else:
+                    ax.plot(x, y, z, 'ro')
+        # Initial 3D perspective
+        azim = -60
+        elev = 30
+        plt.ion()
+        try:
+            while True:
+                plt.clf()  # 清除之前画的图
+                fig = plt.gcf()  # 获取当前图
+                ax = fig.gca(projection='3d')  # 获取当前轴
+                ax.view_init(elev, azim)  # 设定角度
+                plot_anchors(ax, selected_anc)
+
+                plt.pause(0.001)  # 暂停一段时间，不然画的太快会卡住显示不出来
+                #elev, azim = ax.elev, ax.azim  # 将当前绘制的三维图角度记录下来，用于下一次绘制（放在ioff()函数前后都可以，但放在其他地方就不行）
+                elev, azim = ax.elev, ax.azim - 1 # 可自动旋转角度，不需要人去拖动
+                plt.ioff()  # 关闭画图窗口Z
+            plt.show()
+        except BaseException as e:
+            raise(e)
 
 if __name__ == '__main__':
     PARTICLE_COUNT = 2000    # Total number of particles
@@ -289,14 +325,18 @@ if __name__ == '__main__':
     # create the particle filter maze world
     anchor_list = [('C584',30,16,78), ('DA36',21,335,129), ('9234',295,278,81), ('8287',269,37,72)] # unit in cm
     maze_data = None
-    world = Maze(maze_data, anc_list=anchor_list)
+    
 
     RANDOM_LOSS = False
-
+    PLOT_3D = False
+    if PLOT_3D:
+        world = Maze(maze_data, anc_list=anchor_list, turtle_init=False)
+        pl = NBPlot(world)
+    else:
+        world = Maze(maze_data, anc_list=anchor_list, turtle_init=True)
     # initial distribution assigns each particle an equal probability
     particles = Particle.create_random_particles(PARTICLE_COUNT, world)
     robbie = Robot(world)
-
     while True:
         # To expand the dimensions, use multiple anchors, then we have multiple readings
         # for particles and adjust particle weights accordingly. 
@@ -320,15 +360,20 @@ if __name__ == '__main__':
             else:
                 p.w = 0
         # ---------- Try to find current best estimate for display ----------
-        m_x, m_y, m_z, confidence_indicator = compute_mean_point(world, particles, dist_threshold=5)
         if new_uwb_pos_semaphore:
             robbie.x, robbie.y, robbie.z = last_uwb_pos[0]['x']*100, last_uwb_pos[0]['y']*100, last_uwb_pos[0]['z']*100 #unit in cm
             new_uwb_pos_semaphore = False
         # ---------- Show current state ----------
-        world.draw(selected_anc)
-        world.show_particles(particles)
-        world.show_mean(m_x, m_y, confidence_indicator)
-        world.show_robot(robbie)
+        m_x, m_y, m_z, confidence_indicator = compute_mean_point(world, particles, dist_threshold=5)
+        if not PLOT_3D:
+            world.draw(selected_anc)
+            world.show_particles(particles)
+            world.show_mean(m_x, m_y, confidence_indicator)
+            world.show_robot(robbie)
+        else:
+            if plt.get_backend() == "MacOSX":   # MacOS might require a different start method
+                mp.set_start_method("forkserver")
+            pl.plot(data=[selected_anc, robbie, particles, (m_x, m_y, m_z, confidence_indicator)])
         # ---------- Shuffle particles ----------
         new_particles = []
 
@@ -356,11 +401,11 @@ if __name__ == '__main__':
         # print("Robot speed: {}, picked particle: {}, generated particle: {}"
         #         .format(robbie.speed, len(picked), len(generated)))
         print("particle x range: [{}-{}] y range: [{}-{}] z range: [{}-{}]"
-                   .format(round(min([p.x for p in particles]),2), round(max([p.x for p in particles]),2), 
-                           round(min([p.y for p in particles]),2), round(max([p.y for p in particles]),2),
-                           round(min([p.z for p in particles]),2), round(max([p.z for p in particles]),2)))
+                .format(round(min([p.x for p in particles]),2), round(max([p.x for p in particles]),2), 
+                        round(min([p.y for p in particles]),2), round(max([p.y for p in particles]),2),
+                        round(min([p.z for p in particles]),2), round(max([p.z for p in particles]),2)))
         print("particle x: {} y: {} z: {}"
-                   .format(round(m_x,2), round(m_y,2), round(m_z, 2)))
+                .format(round(m_x,2), round(m_y,2), round(m_z, 2)))
         print("uwb x: {}, y: {}, z: {}".format(round(robbie.x,2), round(robbie.y, 2), round(robbie.z,2)))
         if speed_window:
             robbie.speed = sum(speed_window) / len(speed_window)
@@ -373,8 +418,3 @@ if __name__ == '__main__':
         for p in particles:
             p.xy_heading += d_xy_heading # in case robot changed xy_heading, swirl particle xy_heading too
             p.advance_by(robbie.speed)
-    # Blocking call that processes network traffic, dispatches callbacks and
-    # handles reconnecting.
-    # Other loop*() functions are available that give a threaded interface and a
-    # manual interface.
-    # client.loop_forever()

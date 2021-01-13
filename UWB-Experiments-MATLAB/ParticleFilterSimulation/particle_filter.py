@@ -325,5 +325,5 @@ if __name__ == "__main__":
         # Move particles according to my belief of movement (this may
         # be different than the real movement, but it's all I got)
         for p in particles:
-            # p.xy_heading += d_h # in case robot changed xy_heading, swirl particle xy_heading too
+            p.xy_heading += d_h # in case robot changed xy_heading, swirl particle xy_heading too
             p.advance_by(robbie.speed)

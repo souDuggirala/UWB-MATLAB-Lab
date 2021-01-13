@@ -14,27 +14,19 @@ import time
 
 from typing import (Dict, List, Tuple, Set)
 
-turtle.tracer(0, delay=0)
-turtle.register_shape("dot", ((-3,-3), (-3,3), (3,3), (3,-3)))
-turtle.register_shape("tri", ((-3, -2), (0, 3), (3, -2), (0, 0)))
-turtle.speed(10)
-turtle.setworldcoordinates(0, 0, 350, 350)
-turtle.title("Poor robbie is lost")
 UPDATE_EVERY = 0
 DRAW_EVERY = 0
-
 class Maze(object):
-    def __init__(self, maze_matrix, anc_list=None, block_width=5):
+    def __init__(self, maze_matrix, anc_list=None, block_width=5, turtle_init=True):
         self.block_witdh = block_width
         self.update_cnt = 0
         self.blocks = []
         self.beacons = []
-    
+
         if not anc_list:
             self.maze = maze_matrix
             self.length   = len(maze_matrix[0])
             self.width  = len(maze_matrix)
-            turtle.setworldcoordinates(0, 0, self.length, self.width)
             cnt = 0
             for y, line in enumerate(self.maze):
                 for x, block in enumerate(line):
@@ -64,8 +56,16 @@ class Maze(object):
             self.beacons = anc_list
             for anc in anc_list:
                 self.blocks.append((anc[1]-self.block_witdh/2, anc[2]-self.block_witdh/2))
-        self.one_px = float(turtle.window_width()) / float(self.length) / 0.002
-
+        if turtle_init:
+            turtle.tracer(0, delay=0)
+            turtle.register_shape("dot", ((-3,-3), (-3,3), (3,3), (3,-3)))
+            turtle.register_shape("tri", ((-3, -2), (0, 3), (3, -2), (0, 0)))
+            turtle.speed(10)
+            turtle.setworldcoordinates(0, 0, 350, 350)
+            turtle.title("Poor robbie is lost")
+            turtle.setworldcoordinates(0, 0, self.length, self.width)
+            self.one_px = float(turtle.window_width()) / float(self.length) / 0.002
+            
     def draw(self, selected_beacons):
         # draw the blocks of the maze
         turtle.color("#000000")
@@ -181,8 +181,7 @@ class Maze(object):
 
     def euclidean_dist_xy(self, x1, y1, x2, y2):
         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-
-
+        
     #  ---------------only for simulation, no Z-axis involved-------
     def distance_to_nearest_beacon(self, x, y, z=0) -> float:
         d = float('inf')
