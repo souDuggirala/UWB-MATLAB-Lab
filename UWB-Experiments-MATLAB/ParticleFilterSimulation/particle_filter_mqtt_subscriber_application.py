@@ -273,35 +273,6 @@ def particle_anchor_ranging(selected_anc, json_dict, particle):
             ret.append(float('inf'))
     return ret
 
-def plot_3d(self, selected_anc, particles, robbie, mean_point_data):
-        # https://stackoverflow.com/questions/34764535/why-cant-matplotlib-plot-in-a-different-thread
-        (m_x, m_y, m_z, confidence_indicator) = mean_point_data
-        def plot_anchors(ax, selected_anc):
-            for i in range(len(self.beacons)):
-                x, y, z = self.beacons[i][1],self.beacons[i][2],self.beacons[i][3]
-                if self.beacons[i][0] in selected_anc:
-                    ax.plot(x, y, z, 'wo')
-                else:
-                    ax.plot(x, y, z, 'ro')
-        # Initial 3D perspective
-        azim = -60
-        elev = 30
-        plt.ion()
-        try:
-            while True:
-                plt.clf()  # 清除之前画的图
-                fig = plt.gcf()  # 获取当前图
-                ax = fig.gca(projection='3d')  # 获取当前轴
-                ax.view_init(elev, azim)  # 设定角度
-                plot_anchors(ax, selected_anc)
-
-                plt.pause(0.001)  # 暂停一段时间，不然画的太快会卡住显示不出来
-                #elev, azim = ax.elev, ax.azim  # 将当前绘制的三维图角度记录下来，用于下一次绘制（放在ioff()函数前后都可以，但放在其他地方就不行）
-                elev, azim = ax.elev, ax.azim - 1 # 可自动旋转角度，不需要人去拖动
-                plt.ioff()  # 关闭画图窗口Z
-            plt.show()
-        except BaseException as e:
-            raise(e)
 
 if __name__ == '__main__':
     PARTICLE_COUNT = 2000    # Total number of particles
@@ -328,7 +299,7 @@ if __name__ == '__main__':
     
 
     RANDOM_LOSS = False
-    PLOT_3D = False
+    PLOT_3D = True
     if PLOT_3D:
         world = Maze(maze_data, anc_list=anchor_list, turtle_init=False)
         pl = NBPlot(world)
