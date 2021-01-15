@@ -16,46 +16,34 @@ from typing import (Dict, List, Tuple, Set)
 
 UPDATE_EVERY = 0
 DRAW_EVERY = 0
+# maze_data = (   ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ),
+#                 ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#                 ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#                 ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#                 ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#                 ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#                 ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#                 ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#                 ( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ),
+#                 ( 3, 0, 0, 0, 0, 0, 0, 0, 0, 3 ))
+
 class Maze(object):
     def __init__(self, maze_matrix, anc_list=None, block_width=5, turtle_init=True):
         self.block_witdh = block_width
-        self.update_cnt = 0
         self.blocks = []
+        for anc in anc_list:
+            self.blocks.append((anc[1]-self.block_witdh/2, anc[2]-self.block_witdh/2))
+        self.update_cnt = 0
         self.beacons = []
-
-        if not anc_list:
-            self.maze = maze_matrix
-            self.length   = len(maze_matrix[0])
-            self.width  = len(maze_matrix)
-            cnt = 0
-            for y, line in enumerate(self.maze):
-                for x, block in enumerate(line):
-                    if block:
-                        nb_y = self.width - y - self.block_witdh
-                        # (x, nb_y) is the lower-left corner of the block
-                        self.blocks.append((x, nb_y))
-                        if block == 2: # one at each corner
-                            self.beacons.extend(((str(cnt+1), x, nb_y, float('inf')), 
-                                                (str(cnt+2), x+1, nb_y, float('inf')), 
-                                                (str(cnt+3), x, nb_y+1, float('inf')), 
-                                                (str(cnt+4), x+1, nb_y+1, float('inf'))))
-                            cnt += 4
-                        if block == 3: # one at center only
-                            self.beacons.append((str(cnt+1), x + self.block_witdh/2, nb_y + self.block_witdh/2, float('inf')))
-                            cnt += 1
-            self.anchor_x_list, self.anchor_y_list, self.anchor_z_list = \
-                [b[1] for b in self.beacons], [b[2] for b in self.beacons], [0 for b in self.beacons]
-        else:
-            self.maze = None
-            self.anchor_x_list = [anc[1] for anc in anc_list]
-            self.anchor_y_list = [anc[2] for anc in anc_list]
-            self.anchor_z_list = [anc[3] for anc in anc_list]
-            self.length = max(self.anchor_x_list) - min(self.anchor_x_list)
-            self.width = max(self.anchor_y_list) - min(self.anchor_y_list)
-            self.height = max(self.anchor_z_list) - min(self.anchor_z_list)
-            self.beacons = anc_list
-            for anc in anc_list:
-                self.blocks.append((anc[1]-self.block_witdh/2, anc[2]-self.block_witdh/2))
+        self.maze = None
+        self.anchor_x_list = [anc[1] for anc in anc_list]
+        self.anchor_y_list = [anc[2] for anc in anc_list]
+        self.anchor_z_list = [anc[3] for anc in anc_list]
+        self.length = max(self.anchor_x_list) - min(self.anchor_x_list)
+        self.width = max(self.anchor_y_list) - min(self.anchor_y_list)
+        self.height = max(self.anchor_z_list) - min(self.anchor_z_list)
+        self.beacons = anc_list
+        
         if turtle_init:
             turtle.tracer(0, delay=0)
             turtle.register_shape("dot", ((-3,-3), (-3,3), (3,3), (3,-3)))
@@ -94,21 +82,23 @@ class Maze(object):
     def weight_to_color(self, weight):
         return "#%02x00%02x" % (int(weight * 255), int((1 - weight) * 255))
 
-    def is_in(self, x, y, z=None):
-        if not z:
-            z = min(self.anchor_z_list)
+    def is_in(self, x, y, z=None, **kwargs):
         if x < min(self.anchor_x_list) \
         or x > max(self.anchor_x_list) \
         or y < min(self.anchor_y_list) \
-        or y > max(self.anchor_y_list) \
-        :
-            return False
+        or y > max(self.anchor_y_list):
+            if kwargs.get('z_range', None) is None:
+                return False
+            else:
+                if z > kwargs.get('z_range')[1] \
+                or z < kwargs.get('z_range')[0]:
+                    return False
         return True
 
-    def is_free(self, x, y, z=None):
+    def is_free(self, x, y, z=None, **kwargs):
         if not z:
             z = min(self.anchor_z_list)
-        if not self.is_in(x, y, z):
+        if not self.is_in(x, y, z, **kwargs):
             return False
         
         yy = self.width - int(y) - 1
@@ -164,16 +154,19 @@ class Maze(object):
         turtle.stamp()
         turtle.update()
 
-    def random_place(self):
+    def random_place(self, **kwargs):
         x = random.uniform(min(self.anchor_x_list), max(self.anchor_x_list))
         y = random.uniform(min(self.anchor_y_list), max(self.anchor_y_list))
-        z = random.uniform(50, 150)
+        if kwargs.get('z_range', None) is None:
+            z = 0
+        else:
+            z = random.uniform(min(kwargs.get('z_range')), max(kwargs.get('z_range')))
         return x, y, z
 
-    def random_free_place(self):
+    def random_free_place(self, **kwargs):
         while True:
-            x, y, z = self.random_place()
-            if self.is_free(x, y, z):
+            x, y, z = self.random_place(**kwargs)
+            if self.is_free(x, y, z, **kwargs):
                 return x, y, z
 
     def euclidean_dist(self, x1, y1, z1, x2, y2, z2):
