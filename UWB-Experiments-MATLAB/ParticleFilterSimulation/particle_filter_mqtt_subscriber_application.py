@@ -19,26 +19,28 @@ import numpy as np
 from scipy.stats import multivariate_normal
 import bisect
 
-import time
-
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import multiprocessing as mp
 import time
 
 
-AXIAL_NOISE=5
+AXIAL_NOISE, AXIAL_NOISE_LARGE=5,0.1
 SPEED_NOISE=0.5
-AXIAL_NOISE_LARGE=0.1
-HEADING_NOISE, HEADING_RANGE = 5, [0, 360]
-PITCH_NOISE, PITCH_RANGE = 5, [-90, 90]
+HEADING_NOISE, HEADING_RANGE = 10, [0, 360]
+PITCH_NOISE, PITCH_RANGE = 10, [-90, 90]
+Z_RANGE = [30,150]
+WEIGHT_CUT_OFF = 0.3
 
 # ------------------------------------------------------------------------
 # Some utility functions
 
-def add_noise(level, range_lim, *coords):
+def add_noise(level, range_lim=None, *coords):
     if len(coords)==1:
-        raw = coords[0] + random.uniform(-level, level)
+        if isinstance(coords[0], List):
+            raw = [x + random.uniform(-level, level) for x in coords[0]]    
+        else:
+            raw = coords[0] + random.uniform(-level, level)
     else:
         raw = [x + random.uniform(-level, level) for x in coords]
     if not range_lim:
@@ -58,23 +60,23 @@ def add_noise(level, range_lim, *coords):
 
 # This is just a gaussian kernel I pulled out of my hat, to transform
 # values near to robbie's measurement => 1, further away => 0
-sigma = 15
-sigma2 = sigma ** 2
-def w_gauss(a, b):
+SIGMA = 15
+def w_gauss(a, b, sigma):
     error = a - b
+    sigma2 = sigma ** 2
     g = math.e ** -(error ** 2 / (2 * sigma2))
     return g
 
 # This is the 0-mean multivariate gaussian pdf value serves as the weight
 # values near to robbie's measurement => 1, further away => 0
 # the pdf value is not normalized
-def w_gauss_multi(a: List, b: List) -> float:
+def w_gauss_multi(a: List, b: List, sigma: float) -> float:
     a_valid = [i for i in range(len(a)) if a[i] != float('inf')]
     b_valid = [i for i in range(len(b)) if b[i] != float('inf')]
     intersection_idx = [i for i in a_valid if i in b_valid]
     a = np.asarray([a[i] for i in intersection_idx])
     b = np.asarray([b[i] for i in intersection_idx])
-    
+    sigma2 = sigma ** 2
     dim = len(a)
     if dim > 0:
         error = (a - b)
@@ -132,8 +134,8 @@ class WeightedDistribution(object):
         try:
             uni = random.uniform(0, 1)
             idx = bisect.bisect_left(self.distribution, uni)
-            a = self.state[idx]
-            return a
+            picked_p = self.state[idx]
+            return picked_p
         except IndexError:
             # Happens when all particles are improbable w=0
             return None
@@ -170,7 +172,7 @@ class Particle(object):
 
     @classmethod
     def create_random_particles(cls, particle_count, maze):
-        return [cls(*maze.random_free_place()) for _ in range(0, particle_count)]
+        return [cls(*maze.random_free_place(z_range=Z_RANGE)) for _ in range(0, particle_count)]
 
     def advance_by(self, speed, delta_t=1, checker=None, noisy=False):
         xy_heading = self.xy_heading
@@ -199,7 +201,7 @@ class Robot(Particle):
     speed = 0
 
     def __init__(self, maze):
-        super(Robot, self).__init__(*maze.random_free_place(), xy_heading=90)
+        super(Robot, self).__init__(*maze.random_free_place(z_range=Z_RANGE), xy_heading=90)
         self.chose_random_direction()
         self.step_count = 0
 
@@ -277,27 +279,16 @@ def particle_anchor_ranging(selected_anc, json_dict, particle):
 if __name__ == '__main__':
     PARTICLE_COUNT = 2000    # Total number of particles
 
-    ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
-    # makes orientation a lot easier since it knows which direction it is facing.
-    # If not -- and that is really fascinating -- the particle filter can work
-    # out its xy_heading too, it just takes more particles and more time. 
-    mqtt_data = None
-    speed_window = []
-    spd_window_size = 10
-    last_uwb_pos = None
-    new_uwb_pos_semaphore = False
-
-    client = mqtt.Client()
-    client.on_connect = mqtt_on_connect
-    client.on_message = mqtt_on_message
-    client.connect("192.168.0.182", 1883, 60)
-    client.loop_start()
-
     # create the particle filter maze world
     anchor_list = [('C584',30,16,78), ('DA36',21,335,129), ('9234',295,278,81), ('8287',269,37,72)] # unit in cm
     maze_data = None
-    
 
+    ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
+    # makes orientation a lot easier since it knows which direction it is facing.
+    # If not -- and that is really fascinating -- the particle filter can work
+    # out its xy_heading too, it just takes more particles and more time. Try this
+    # with 3000+ particles, it obviously needs lots more hypotheses as a particle
+    # now has to correctly match not only the position but also the xy_heading.
     RANDOM_LOSS = False
     PLOT_3D = True
     if PLOT_3D:
@@ -308,6 +299,19 @@ if __name__ == '__main__':
     # initial distribution assigns each particle an equal probability
     particles = Particle.create_random_particles(PARTICLE_COUNT, world)
     robbie = Robot(world)
+
+    last_uwb_pos = None
+    new_uwb_pos_semaphore = False
+    mqtt_data = None
+    spd_window_size = 10
+    speed_window = []
+
+    client = mqtt.Client()
+    client.on_connect = mqtt_on_connect
+    client.on_message = mqtt_on_message
+    client.connect("192.168.0.182", 1883, 60)
+    client.loop_start()
+
     while True:
         # To expand the dimensions, use multiple anchors, then we have multiple readings
         # for particles and adjust particle weights accordingly. 
@@ -318,15 +322,13 @@ if __name__ == '__main__':
         selected_anc = parse_anchor_id(mqtt_data)
         if RANDOM_LOSS:
             selected_anc = random.sample(selected_anc, random.randint(0, len(selected_anc)))
-        r_ds = parse_tag_ranging(selected_anc, mqtt_data)  
-        # unit in m, if not projection, the elevation prevents the correct result
-        r_ds = [round(i*100) for i in r_ds]                 
-        # convert unit to cm
+        r_ds = parse_tag_ranging(selected_anc, mqtt_data)  # unit in m
+        r_ds = [round(i*100) for i in r_ds]     # convert unit to cm
         for p in particles:
-            if world.is_free(*p.xyz):
+            if world.is_free(*p.xyz, z_range=Z_RANGE):
                 p_ds = particle_anchor_ranging(selected_anc, mqtt_data, p)
-                new_weight = w_gauss_multi(r_ds, p_ds)
-                if new_weight:
+                new_weight = w_gauss_multi(r_ds, p_ds, sigma=SIGMA)
+                if new_weight is not None:
                     p.w = new_weight
             else:
                 p.w = 0
@@ -353,7 +355,8 @@ if __name__ == '__main__':
         if nu:
             for p in particles:
                 p.w = p.w / nu
-        # print(min([p.w for p in particles]), max([p.w for p in particles]))      
+
+        print("min weight: {}, max weight: {}".format(min([p.w for p in particles]), max([p.w for p in particles])))
         picked, generated = [], []
         # create a weighted distribution, for fast picking
         dist = WeightedDistribution(particles)
@@ -363,14 +366,15 @@ if __name__ == '__main__':
                 new_particle = Particle.create_random_particles(1, world)[0]
                 generated.append(new_particle)
             else:
-                new_particle = Particle(p.x, p.y, p.z, xy_heading=None, noisy=True)
+                new_particle = Particle(p.x, p.y, p.z, 
+                        xy_heading=p.xy_heading, noisy=True)
                 picked.append(new_particle)
             new_particles.append(new_particle)
 
         particles = new_particles
         # print(r_ds, p_ds)
-        # print("Robot speed: {}, picked particle: {}, generated particle: {}"
-        #         .format(robbie.speed, len(picked), len(generated)))
+        print("Robot speed: {}, picked particle: {}, generated particle: {}"
+                .format(robbie.speed, len(picked), len(generated)))
         print("particle x range: [{}-{}] y range: [{}-{}] z range: [{}-{}]"
                 .format(round(min([p.x for p in particles]),2), round(max([p.x for p in particles]),2), 
                         round(min([p.y for p in particles]),2), round(max([p.y for p in particles]),2),

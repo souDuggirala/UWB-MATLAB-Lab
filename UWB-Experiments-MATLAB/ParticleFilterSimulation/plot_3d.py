@@ -16,6 +16,9 @@ class ProcessPlotter(object):
         plt.close('all')
 
     def call_back(self):
+        xlm=self.ax.get_xlim3d() #we use them in the next
+        ylm=self.ax.get_ylim3d() #we use them in the next
+        zlm=self.ax.get_zlim3d() #graph to reproduce the magnification from mousing
         while self.pipe.poll():
             command = self.pipe.recv()
             if command is None:
@@ -26,6 +29,10 @@ class ProcessPlotter(object):
                 self.ax.set_xlabel('X axis')
                 self.ax.set_ylabel('Y axis')
                 self.ax.set_zlabel('Z axis')
+                if xlm != (0, 1.0): # (0,1.0) by default, avoid the default because we want the lim to be calculated automatically
+                    self.ax.set_xlim3d(xlm[0], xlm[1])
+                    self.ax.set_ylim3d(ylm[0], ylm[1])
+                    self.ax.set_zlim3d(zlm[0], zlm[1])
                 [selected_anc, robbie, particles, (m_x, m_y, m_z, confidence_indicator)] = command
                 # draw the beacons/anchors
                 x, y, z, attr = [], [] ,[], []
@@ -39,10 +46,15 @@ class ProcessPlotter(object):
                 for p in particles:
                     draw_cnt += 1
                     if DRAW_EVERY == 0 or draw_cnt % DRAW_EVERY == 1:
-                        # Keep track of which positions already have something
-                        # drawn to speed up display rendering
-                        self.ax.plot(p.x, p.y, p.z, 'bo')
+                        self.ax.plot(p.x, p.y, p.z, 'bo', markersize=0.5)
+                self.ax.plot(robbie.x, robbie.y, robbie.z, 'g*', markersize=20)
                 self.fig.canvas.draw()
+                xlm=self.ax.get_xlim3d() #These are two tupples
+                ylm=self.ax.get_ylim3d() #we use them in the next
+                zlm=self.ax.get_zlim3d() #graph to reproduce the magnification from mousing
+                azm=self.ax.azim
+                ele=self.ax.elev
+                
         return True
 
     def __call__(self, pipe):
