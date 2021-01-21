@@ -12,7 +12,7 @@ from typing import (Dict, List, Tuple, Set)
 import paho.mqtt.client as mqtt
 import json
 from draw import *
-from plot_3d import ProcessPlotter, NBPlot
+from plot_3d import *
 import random
 import math
 import numpy as np
@@ -147,10 +147,12 @@ class Particle(object):
             xy_heading = random.uniform(HEADING_RANGE[0], HEADING_RANGE[1])
         if pitch is None:
             pitch = random.uniform(PITCH_RANGE[0], PITCH_RANGE[1])
+            pitch = 0
         if noisy:
             x, y, z = add_noise(AXIAL_NOISE, [], x, y, z)
             xy_heading = add_noise(HEADING_NOISE, HEADING_RANGE, xy_heading)
             pitch = add_noise(PITCH_NOISE, PITCH_RANGE, pitch)
+            pitch = 0
 
         self.x = x
         self.y = y
@@ -174,6 +176,18 @@ class Particle(object):
     def create_random_particles(cls, particle_count, maze):
         return [cls(*maze.random_free_place(z_range=Z_RANGE)) for _ in range(0, particle_count)]
 
+    def sim_read_nearest_sensor(self, maze):
+        """
+        Find distance to nearest beacon.
+        """
+        return maze.distance_to_nearest_beacon(*self.xyz)
+    
+    def sim_read_sensors(self, maze):
+        """
+        Find all distances to all available beacons.
+        """
+        return maze.distances_to_all_beacons(*self.xyz)
+
     def advance_by(self, speed, delta_t=1, checker=None, noisy=False):
         xy_heading = self.xy_heading
         pitch = self.pitch
@@ -181,10 +195,10 @@ class Particle(object):
             speed = add_noise(SPEED_NOISE, [], speed)
             xy_heading = add_noise(HEADING_NOISE, HEADING_RANGE, xy_heading)
             pitch = add_noise(PITCH_NOISE, PITCH_RANGE, pitch)
-        r, pitch_r = math.radians(xy_heading), math.radians(pitch)
-        speed_xy = math.cos(pitch_r)
-        dx = math.sin(r) * speed_xy * delta_t
-        dy = math.cos(r) * speed_xy * delta_t
+        xy_heading_r, pitch_r = math.radians(xy_heading), math.radians(pitch)
+        speed_xy = math.cos(pitch_r) * speed
+        dx = math.sin(xy_heading_r) * speed_xy * delta_t
+        dy = math.cos(xy_heading_r) * speed_xy * delta_t
         dz = math.sin(pitch_r) * speed * delta_t
         if checker is None or checker(self, dx, dy, dz):
             self.move_by(dx, dy, dz)
@@ -206,26 +220,61 @@ class Robot(Particle):
         self.step_count = 0
 
     def chose_random_direction(self):
-        xy_heading = random.uniform(0, 360)
-        self.xy_heading = xy_heading
+        self.xy_heading = random.uniform(HEADING_RANGE[0], HEADING_RANGE[1])
+
+    def sim_read_nearest_sensor(self, maze, noise_level=AXIAL_NOISE):
+        """
+        Poor robot, it's sensors are noisy and pretty strange,
+        it only can measure the distance to the nearest beacon(!)
+        and is not very accurate at that too!
+        """
+        return add_noise(noise_level, super(Robot, self).sim_read_nearest_sensor(maze))
+    
+    def sim_read_sensors(self, maze, range_lim=[], noise_level=AXIAL_NOISE):
+        """
+        Returns the distances to all the sensors (beacons) in the same order as
+        the way sensors are stored (maze.beacons). 
+        -------------
+        random_loss: True/False
+            Simulate the randomized reading loss for some of the sensors (beacons)
+        """
+        return add_noise(noise_level, range_lim, super(Robot, self).sim_read_sensors(maze))
 
     def move(self, maze, speed, delta_t):
         """
-        Move the robot. Note that the movement is stochastic too.
+        Move the robot with true application readings. Note that the movement is stochastic too.
         """
         self.step_count += 1
         self.advance_by(speed, delta_t=1, noisy=True, checker=None)
+    
+    def sim_move(self, maze, speed, delta_t):
+        """
+        Move the robot in simulation. Note that the movement is stochastic too.
+        """
+        self.step_count += 1
+        while True:
+            if self.advance_by(speed, delta_t=1, noisy=True,
+                        checker=lambda r, dx, dy, dz: maze.is_free(r.x+dx, r.y+dy, r.z+dz)):
+                break
+            # In simulation, bumped into something or too long in same direction,
+            # chose random new direction
+            self.chose_random_direction()
 
 
-# The callback for when the client receives a CONNACK response from the server.
 def mqtt_on_connect(client, userdata, flags, rc):
-    print("Connected with result code "+str(rc))
+    """
+    The callback for when the client receives a CONNACK response from the server.
+    """
+    print("MQTT connected with result code "+str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
     client.subscribe("Tag/9A1C/Uplink/Location")
 
-# The callback for when a PUBLISH message is received from the server.
+
 def mqtt_on_message(client, userdata, msg):
+    """
+    The callback for when a PUBLISH message is received from the server.
+    """
     global mqtt_data, spd_window_size, last_uwb_pos, new_uwb_pos_semaphore
     prev_mqtt_data = mqtt_data
     mqtt_data = json.loads(msg.payload.decode("utf-8"))
@@ -277,65 +326,107 @@ def particle_anchor_ranging(selected_anc, json_dict, particle):
 
 
 if __name__ == '__main__':
-    PARTICLE_COUNT = 2000    # Total number of particles
-
+    PARTICLE_COUNT = 2000       # Total number of particles
+    SIMULATION = False           # switch between simulation and application
     # create the particle filter maze world
-    anchor_list = [('C584',30,16,78), ('DA36',21,335,129), ('9234',295,278,81), ('8287',269,37,72)] # unit in cm
+    # anchor_list = [('00',0,0,0), ('01',9,0,0), ('02',9,9,0), ('03',0,9,0)] # no units
+    anchor_list = [('C584',16,0,151), ('DA36',40,325,79), ('9234',291,285,55), ('8287',270,0,134)] # unit in cm
     maze_data = None
 
     ROBOT_HAS_COMPASS = False # Does the robot know where north is? If so, it
     # makes orientation a lot easier since it knows which direction it is facing.
     # If not -- and that is really fascinating -- the particle filter can work
     # out its xy_heading too, it just takes more particles and more time. Try this
-    # with 3000+ particles, it obviously needs lots more hypotheses as a particle
+    # with 3000+ particles, it obviously needs lots more hypotheses as a 2
     # now has to correctly match not only the position but also the xy_heading.
     RANDOM_LOSS = False
     PLOT_3D = True
+    PLOT_PARTICLE_STATS = True
     if PLOT_3D:
         world = Maze(maze_data, anc_list=anchor_list, turtle_init=False)
-        pl = NBPlot(world)
+        pl = NBWorldPlot(world=world)
     else:
         world = Maze(maze_data, anc_list=anchor_list, turtle_init=True)
+    if PLOT_PARTICLE_STATS:
+        pl_stats = NBStatsPlot()
     # initial distribution assigns each particle an equal probability
     particles = Particle.create_random_particles(PARTICLE_COUNT, world)
     robbie = Robot(world)
 
-    last_uwb_pos = None
-    new_uwb_pos_semaphore = False
-    mqtt_data = None
-    spd_window_size = 10
-    speed_window = []
-
-    client = mqtt.Client()
-    client.on_connect = mqtt_on_connect
-    client.on_message = mqtt_on_message
-    client.connect("192.168.0.182", 1883, 60)
-    client.loop_start()
-
+    if not SIMULATION:
+        last_uwb_pos = None
+        new_uwb_pos_semaphore = False
+        mqtt_data = None
+        spd_window_size = 10
+        speed_window = []
+        client = mqtt.Client()
+        client.on_connect = mqtt_on_connect
+        client.on_message = mqtt_on_message
+        client.connect("192.168.0.182", 1883, 60)
+        client.loop_start()
+    else:
+        robbie.x, robbie.y, robbie.z = 308, 122, 60
     while True:
         # To expand the dimensions, use multiple anchors, then we have multiple readings
         # for particles and adjust particle weights accordingly. 
         # Update particle weight according to how good every particle matches
         # robbie's sensor reading
-        if not mqtt_data:
-            continue
-        selected_anc = parse_anchor_id(mqtt_data)
-        if RANDOM_LOSS:
-            selected_anc = random.sample(selected_anc, random.randint(0, len(selected_anc)))
-        r_ds = parse_tag_ranging(selected_anc, mqtt_data)  # unit in m
-        r_ds = [round(i*100) for i in r_ds]     # convert unit to cm
+        print("WANRING: This version of particle filter is deprecated.\nUse particle_filter.py instead\nSelect option by setting SIMULATION=True/False in particle_filter.py\n")
+        if not SIMULATION:
+            if not mqtt_data:
+                continue
+            selected_anc = sorted(parse_anchor_id(mqtt_data))
+            if not RANDOM_LOSS:
+                chosen_idx = list(range(len(selected_anc)))
+            else:
+                chosen_idx = random.sample(range(len(selected_anc)), random.randint(0, len(selected_anc)))
+                selected_anc = random.sample(selected_anc, random.randint(0, len(selected_anc)))
+            r_ds = parse_tag_ranging(selected_anc, mqtt_data)  # unit in m
+            r_ds = [round(i*100) for i in r_ds]     # convert unit to cm
+        else:
+            r_ds = robbie.sim_read_sensors(world)
+            if not RANDOM_LOSS:
+                chosen_idx = list(range(len(r_ds)))
+            else:
+                chosen_idx = random.sample(range(len(r_ds)), random.randint(0, len(r_ds)))
+            selected_anc = [sorted([anchor_list[i][0] for j in anchor_list])[i] for i in chosen_idx]
+            for i in range(len(r_ds)):
+                if i not in chosen_idx:
+                    r_ds[i] = float('inf')
+        
+        # ---------- Update particle weights ----------
+
+        max_weight = 0
         for p in particles:
-            if world.is_free(*p.xyz, z_range=Z_RANGE):
-                p_ds = particle_anchor_ranging(selected_anc, mqtt_data, p)
+            if world.is_free(*p.xyz):
+                if not SIMULATION:
+                    p_ds = particle_anchor_ranging(selected_anc, mqtt_data, p)
+                else:
+                    p_ds = p.sim_read_sensors(world)
+                    for i in range(len(r_ds)):
+                        if i not in chosen_idx:
+                            p_ds[i] = float('inf')
                 new_weight = w_gauss_multi(r_ds, p_ds, sigma=SIGMA)
+                max_weight = max(max_weight, new_weight)
                 if new_weight is not None:
+                    # if new_weight > 0.95 * (max_weight):
+                        # print(selected_anc)
+                        # print(robbie.x, robbie.y, robbie.z)
+                        # print(p.x, p.y, p.z)
+                        # print(r_ds)
+                        # print(p_ds)
+                        # print('\n')
                     p.w = new_weight
             else:
                 p.w = 0
-        # ---------- Try to find current best estimate for display ----------
-        if new_uwb_pos_semaphore:
-            robbie.x, robbie.y, robbie.z = last_uwb_pos[0]['x']*100, last_uwb_pos[0]['y']*100, last_uwb_pos[0]['z']*100 #unit in cm
-            new_uwb_pos_semaphore = False
+        print("before shuffle: min/max weight: {}/{}".format(min([p.w for p in particles]), max([p.w for p in particles])))
+        
+        # ---------- Update the UWB-measured positions ----------
+        if not SIMULATION:
+            if new_uwb_pos_semaphore:
+                robbie.x, robbie.y, robbie.z = last_uwb_pos[0]['x']*100, last_uwb_pos[0]['y']*100, last_uwb_pos[0]['z']*100 #unit in cm
+                new_uwb_pos_semaphore = False
+        
         # ---------- Show current state ----------
         m_x, m_y, m_z, confidence_indicator = compute_mean_point(world, particles, dist_threshold=5)
         if not PLOT_3D:
@@ -350,15 +441,18 @@ if __name__ == '__main__':
         # ---------- Shuffle particles ----------
         new_particles = []
 
-        # Normalise weights
+        # ---------- Normalise weights ----------
+        pl_stats.plot(data=[particles])
         nu = sum(p.w for p in particles)
         if nu:
             for p in particles:
                 p.w = p.w / nu
+        print("after shuffle: min/max weight: {}/{}".format(min([p.w for p in particles]), max([p.w for p in particles])))
+        print("weight sum: {}\n".format(nu))
 
-        print("min weight: {}, max weight: {}".format(min([p.w for p in particles]), max([p.w for p in particles])))
         picked, generated = [], []
-        # create a weighted distribution, for fast picking
+        
+        # ---------- Create a weighted distribution, for fast picking ----------
         dist = WeightedDistribution(particles)
         for _ in particles:
             p = dist.pick()
@@ -367,7 +461,8 @@ if __name__ == '__main__':
                 generated.append(new_particle)
             else:
                 new_particle = Particle(p.x, p.y, p.z, 
-                        xy_heading=p.xy_heading, noisy=True)
+                        xy_heading=robbie.xy_heading if ROBOT_HAS_COMPASS else p.xy_heading, 
+                        noisy=True)
                 picked.append(new_particle)
             new_particles.append(new_particle)
 
@@ -382,14 +477,15 @@ if __name__ == '__main__':
         print("particle x: {} y: {} z: {}"
                 .format(round(m_x,2), round(m_y,2), round(m_z, 2)))
         print("uwb x: {}, y: {}, z: {}".format(round(robbie.x,2), round(robbie.y, 2), round(robbie.z,2)))
-        if speed_window:
-            robbie.speed = sum(speed_window) / len(speed_window)
+        if not SIMULATION:
+            if speed_window:
+                robbie.speed = sum(speed_window) / len(speed_window)
         # ---------- Move things ----------
         old_xy_heading = robbie.xy_heading
         robbie.move(world, speed=robbie.speed, delta_t=1)
         d_xy_heading = robbie.xy_heading - old_xy_heading
         # Move particles according to my belief of movement (this may
         # be different than the real movement, but it's all I got)
-        for p in particles:
-            p.xy_heading += d_xy_heading # in case robot changed xy_heading, swirl particle xy_heading too
-            p.advance_by(robbie.speed)
+        # for p in particles:
+        #     p.xy_heading += d_xy_heading # in case robot changed xy_heading, swirl particle xy_heading too
+        #     p.advance_by(robbie.speed)
