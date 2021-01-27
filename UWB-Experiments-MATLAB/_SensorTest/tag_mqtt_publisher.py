@@ -219,7 +219,7 @@ def make_json_dic(raw_string):
 def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
     # register the callback functions when the service ends
     # atexit for regular exit, signal.signal for system kills    
-    atexit.register(on_exit, t, True)
+    atexit.register(on_exit, serial_port, True)
     signal.signal(signal.SIGTERM, on_killed)
     # Pause for 0.1 sec after establishment
     time.sleep(0.1)
@@ -230,7 +230,7 @@ def parse_uart_init(serial_port, mqtt_broker, mqtt_port):
 
     # By default the update rate is 10Hz/100ms. Check again for data flow
     # if data is flowing before getting the device ID, stop it.
-    if is_reporting_loc(t):
+    if is_reporting_loc(serial_port):
         serial_port.write(b'\x6C\x65\x63\x0D')
         time.sleep(0.1)
 
