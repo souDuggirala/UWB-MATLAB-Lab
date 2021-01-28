@@ -15,6 +15,17 @@ import threading
 # ttyACM2 -> 0E15
 # ttyACM3 -> 15BA
 
+def on_exit(serialport, verbose=False):
+    """ On exit callbacks to make sure the serialport is closed when
+        the program ends.
+    """
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serialport.port))
+    if sys.platform.startswith('linux'):
+        import fcntl
+        fcntl.flock(serialport, fcntl.LOCK_UN)
+    serialport.close()
+
 
 def parse_uart_init(serial_port):
     # register the callback functions when the service ends
@@ -35,16 +46,8 @@ def parse_uart_init(serial_port):
         time.sleep(0.1)
 
 
-def on_exit(serialport, verbose=False):
-    """ On exit callbacks to make sure the serialport is closed when
-        the program ends.
-    """
-    if verbose:
-        sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serialport.port))
-    if sys.platform.startswith('linux'):
-        import fcntl
-        fcntl.flock(serialport, fcntl.LOCK_UN)
-    serialport.close()
+def config_uart_settings(serial_port, settings):
+    pass
 
 
 def parse_uart_reportings(serial_port, data_pointer):
@@ -67,16 +70,19 @@ def parse_uart_reportings(serial_port, data_pointer):
             data = str(serial_port.readline(), encoding="UTF-8").rstrip()
             sys.stdout.write(timestamp_log() + data)
             raise exp
+
         
-def a_end_ranging_thread_job(port, sys_info, data_pointer):
+def end_ranging_thread_job(port_info_dict, data_pointer):
+    port = port_info_dict.get("port")
+    sys_info = port_info_dict.get("sys_info")
     atexit.register(on_exit, port, True)
-    tag_id = sys_info.get("device_id") 
-    upd_rate = sys_info.get("upd_rate")
+    
+    # tag_id = sys_info.get("device_id") 
     # type "lec\n" to the dwm shell console to activate data reporting
-    if not is_reporting_loc(port, timeout=upd_rate/10):        
+    if not is_reporting_loc(port, timeout=sys_info.get("upd_rate")/10):        
         port.write(b'\x6C\x65\x63\x0D')
         time.sleep(0.1)
-    assert is_reporting_loc(port, timeout=upd_rate/10)
+    assert is_reporting_loc(port, timeout=sys_info.get("upd_rate")/10)
     super_frame = 0
     port.reset_input_buffer()
     while True:
@@ -84,45 +90,19 @@ def a_end_ranging_thread_job(port, sys_info, data_pointer):
             data = str(port.readline(), encoding="UTF-8").rstrip()
             if not data[:4] == "DIST":
                 continue
-            data_pointer[0] = make_json_dic(data)
-            # data_pointer[0]['tag_id'] = tag_id
-            data_pointer[0]['superFrameNumber'] = super_frame
-            json_data = json.dumps(data_pointer[0])
+            uwb_reporting_dict = make_json_dic(data)
+            # uwb_reporting_dict['tag_id'] = tag_id
+            uwb_reporting_dict['superFrameNumber'] = super_frame
+            json_data = json.dumps(uwb_reporting_dict)
             # tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
             super_frame += 1
+            data_pointer[0] = uwb_reporting_dict
         except Exception as exp:
             data = str(port.readline(), encoding="UTF-8").rstrip()
-            sys.stdout.write(timestamp_log() + "A End reporting process failed. \n\t\tLast fetched UART data: {}\n".format(data))
+            sys.stdout.write(timestamp_log() + "{} end reporting process failed. \n\t\tLast fetched UART data: {}\n".format(sys_info["config"]["end_size"], data))
             raise exp
             sys.exit()
 
-def b_end_ranging_thread_job(port, sys_info, data_pointer):
-    atexit.register(on_exit, port, True)
-    tag_id = sys_info.get("device_id") 
-    upd_rate = sys_info.get("upd_rate")
-    # type "lec\n" to the dwm shell console to activate data reporting
-    if not is_reporting_loc(port, timeout=upd_rate/10):        
-        port.write(b'\x6C\x65\x63\x0D')
-        time.sleep(0.1)
-    assert is_reporting_loc(port, timeout=upd_rate/10)
-    super_frame = 0
-    port.reset_input_buffer()
-    while True:
-        try:
-            data = str(port.readline(), encoding="UTF-8").rstrip()
-            if not data[:4] == "DIST":
-                continue
-            data_pointer[0] = make_json_dic(data)
-            # data_pointer[0]['tag_id'] = tag_id
-            data_pointer[0]['superFrameNumber'] = super_frame
-            json_data = json.dumps(data_pointer[0])
-            # tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
-            super_frame += 1
-        except Exception as exp:
-            data = str(port.readline(), encoding="UTF-8").rstrip()
-            sys.stdout.write(timestamp_log() + "A End reporting process failed. \n\t\tLast fetched UART data: {}\n".format(data))
-            raise exp
-            sys.exit()
 
 if __name__ == "__main__":
     # Manually change the device setting file (json) before run this program.
@@ -134,12 +114,18 @@ if __name__ == "__main__":
     
     # Identify the Master devices and their ends
     a_end_master, b_end_master = None, None
+    a_end_slave, b_end_slave = None, None
     for dev in uwb_devices:
         if config_data[dev]["config"] == "master":
             if config_data[dev]["end_side"] == "a":
                 a_end_master = dev
             if config_data[dev]["end_side"] == "b":
                 b_end_master = dev
+        if config_data[dev]["config"] == "slave":
+            if config_data[dev]["end_side"] == "a":
+                a_end_slave = dev
+            if config_data[dev]["end_side"] == "b":
+                b_end_slave = dev
     
     serial_devices = ["/dev/ttyACM"+str(i) for i in range(len(uwb_devices))]
     serial_ports = {}
@@ -149,10 +135,12 @@ if __name__ == "__main__":
         # Initialize the UART shell command
         parse_uart_init(p)
         sys_info = get_sys_info(p, verbose=False)
+        device_id_short = sys_info.get("device_id")[-4:]
         # Link the individual Master/Slave with the serial ports by hashmap
-        serial_ports[sys_info.get("device_id")[-4:]] = {}
-        serial_ports[sys_info.get("device_id")[-4:]]["port"] = p
-        serial_ports[sys_info.get("device_id")[-4:]]["sys_info"] = sys_info
+        serial_ports[device_id_short] = {}
+        serial_ports[device_id_short]["port"] = p
+        serial_ports[device_id_short]["sys_info"] = sys_info
+        serial_ports[device_id_short]["config"] = config_data.get(sys_info.get(device_id_short))
         # Type "lec\n" to the dwm shell console to activate data reporting
         if not is_reporting_loc(p, timeout=sys_info.get("upd_rate")/10):
             if dev == a_end_master or dev == b_end_master:
@@ -162,22 +150,41 @@ if __name__ == "__main__":
         # Maybe later we can close the ports linking to the Slave/Anchors if no needs
         
     a_end_dist_ptr, b_end_dist_ptr = [{}], [{}]
-    print(b_end_master, serial_ports[b_end_master]["port"])
-    a_end_ranging_thread = threading.Thread(target=a_end_ranging_thread_job, 
-                                            args=(serial_ports[a_end_master]["port"],
-                                                  serial_ports[a_end_master]["sys_info"],
+    a_end_ranging_thread = threading.Thread(target=end_ranging_thread_job, 
+                                            args=(serial_ports[a_end_master],
                                                   a_end_dist_ptr,),
                                             name="A End Ranging")
-    b_end_ranging_thread = threading.Thread(target=b_end_ranging_thread_job, 
-                                            args=(serial_ports[b_end_master]["port"],
-                                                  serial_ports[b_end_master]["sys_info"],
+    b_end_ranging_thread = threading.Thread(target=end_ranging_thread_job, 
+                                            args=(serial_ports[b_end_master],
                                                   b_end_dist_ptr,),
                                             name="B End Ranging")
     a_end_ranging_thread.daemon, b_end_ranging_thread.daemon = True, True
     a_end_ranging_thread.start()
     b_end_ranging_thread.start()
     
+    
     while True:
-        print("A end reporting: ", a_end_dist_ptr)
-        print("B end reporting: ", b_end_dist_ptr)
-        time.sleep(1)
+        # wait for new UWB reporting results
+        a_end_dist, b_end_dist = a_end_dist_ptr[0], b_end_dist_ptr[0]
+        while True:
+            a_end_dist_new, b_end_dist_new = a_end_dist_ptr[0], b_end_dist_ptr[0]
+            if a_end_dist_new is a_end_dist and b_end_dist_new is b_end_dist:
+                continue
+            else:
+                a_end_dist, b_end_dist = a_end_dist_new, b_end_dist_new
+                break
+        
+        a_ranging_results, b_ranging_results = [], []        
+        for anc in a_end_dist.get("all_anc_id", []):
+            if anc == a_end_slave or anc == b_end_slave:
+                continue
+            a_ranging_results.append((anc, a_end_dist_ptr[0].get(anc, {})))
+        for anc in b_end_dist.get("all_anc_id", []):
+            if anc == a_end_slave or anc == b_end_slave:
+                continue
+            b_ranging_results.append((anc, b_end_dist_ptr[0].get(anc, {}))) 
+        a_ranging_results.sort(key=lambda x: x[1].get("dist_to", float("inf")))
+        b_ranging_results.sort(key=lambda x: x[1].get("dist_to", float("inf")))
+        print("A end reporting: ", a_ranging_results)
+        print("B end reporting: ", b_ranging_results)
+        # time.sleep(1)
