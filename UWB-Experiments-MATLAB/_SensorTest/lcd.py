@@ -166,4 +166,3 @@ if __name__ == "__main__":
         lcd_text("MBTechWorks.com",LCD_LINE_2)
         GPIO.cleanup()
     
-
