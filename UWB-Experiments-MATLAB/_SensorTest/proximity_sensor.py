@@ -81,4 +81,3 @@ if __name__ == "__main__":
         sys.stdout.write(timestamp_log() + "program running time: {} seconds".format(stopt - startt))
         GPIO.cleanup()
   
-
