@@ -1,5 +1,15 @@
 from datetime import datetime
 import sys, time, json, re
+import atexit, signal
+
+
+def load_config_json(json_path):
+    try:
+        with open(json_path) as f:
+            return json.load(f)
+    except BaseException as e:
+        sys.stdout.write(timestamp_log() + "failed to load JSON configuration file\n")
+        raise e
 
 
 def timestamp_log(incl_UTC=False):
@@ -16,73 +26,94 @@ def timestamp_log(incl_UTC=False):
         return local_timestp
 
 
-def on_killed(signum, frame):
-    """ Closure function as handler to signal.signal in order to pass serialport name
+def on_exit(serial_port, verbose=False):
+    """ On exit callbacks to make sure the serial port is closed when
+        the program ends.
+    """
+    if verbose:
+        sys.stdout.write(timestamp_log() + "Serial port {} closed on exit\n".format(serial_port.port))
+    if sys.platform.startswith('linux'):
+        import fcntl
+        fcntl.flock(serial_port, fcntl.LOCK_UN)
+    serial_port.close()
+
+
+def on_killed(serial_port, signum, frame):
+    """ Closure function as handler to signal.signal in order to pass serial port name
     """
     # if killed by UNIX, no need to execute on_exit callback
     atexit.unregister(on_exit)
     sys.stdout.write(timestamp_log() + "Serial port {} closed on killed\n".format(t.port))
     if sys.platform.startswith('linux'):
         import fcntl
-        fcntl.flock(t, fcntl.LOCK_UN)
-    t.close()
+        fcntl.flock(serial_port, fcntl.LOCK_UN)
+    serial_port.close()
 
 
-def load_config_json(json_path):
-    try:
-        with open(json_path) as f:
-            return json.load(f)
-    except BaseException as e:
-        sys.stdout.write(timestamp_log() + "failed to load JSON configuration file\n")
-        raise e
-    
-
-def is_uwb_shell_ok(serialport, verbose=False):
-    """ Detect if the DWM1001 Tag's shell console is responding to \x0D\x0D
-        
-        :returns:
-            True or False
-    """
-    serialport.reset_input_buffer()
-    serialport.write(b'\x0D\x0D')
-    time.sleep(0.1)
-    if verbose:
-        sys.stdout.write(str(serialport.read(serialport.in_waiting))+'\n')
-    if serialport.in_waiting:
-        return True
-    else:
-        return False
-
-
-def is_reporting_loc(serialport, timeout=2):
-    """ Detect if the DWM1001 Tag is running on data reporting mode
-        
-        :returns:
-            True or False
-    """
-    init_bytes_avail = serialport.in_waiting
-    time.sleep(timeout)
-    final_bytes_avail = serialport.in_waiting
-    if final_bytes_avail - init_bytes_avail > 0:
-        time.sleep(0.1)
-        return True
-    time.sleep(0.1)
-    return False
-
-
-def port_available_check(port):
+def port_available_check(serial_port):
     if sys.platform.startswith('linux'):
         import fcntl
     try:
-        fcntl.flock(port, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(serial_port, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except (IOError, BlockingIOError) as exp:
         sys.stdout.write(timestamp_log() + "Port is busy. Another process is accessing the port. \n")
         raise exp
     else:
         sys.stdout.write(timestamp_log() + "Port is ready.\n")
 
+
+def parse_uart_init(serial_port):
+    # register the callback functions when the service ends
+    # atexit for regular exit, signal.signal for system kills    
+    atexit.register(on_exit, serial_port, True)
+    signal.signal(signal.SIGTERM, on_killed)
+    # Pause for 0.1 sec after establishment
+    time.sleep(0.1)
+    # Double enter (carriage return) as specified by Decawave
+    serial_port.write(b'\x0D\x0D')
+    time.sleep(0.1)
+    serial_port.reset_input_buffer()
+
+    # By default the update rate is 10Hz/100ms. Check again for data flow
+    # if data is flowing, stop the data flow (temporarily) to execute commands.
+    if is_reporting_loc(serial_port):
+        serial_port.write(b'\x6C\x65\x63\x0D')
+        time.sleep(0.1)
     
-def get_sys_info(serial_port, verbose=False):
+
+def is_uwb_shell_ok(serial_port, verbose=False):
+    """ Detect if the DWM1001 Tag's shell console is responding to \x0D\x0D
+        
+        :returns:
+            True or False
+    """
+    serial_port.reset_input_buffer()
+    serial_port.write(b'\x0D\x0D')
+    time.sleep(0.1)
+    if verbose:
+        sys.stdout.write(str(serial_port.read(serial_port.in_waiting))+'\n')
+    if serial_port.in_waiting:
+        return True
+    return False
+
+
+def is_reporting_loc(serial_port, timeout=2):
+    """ Detect if the DWM1001 Tag is running on data reporting mode
+        
+        :returns:
+            True or False
+    """
+    init_bytes_avail = serial_port.in_waiting
+    time.sleep(timeout)
+    final_bytes_avail = serial_port.in_waiting
+    if final_bytes_avail - init_bytes_avail > 0:
+        time.sleep(0.1)
+        return True
+    time.sleep(0.1)
+    return False
+
+    
+def parse_uart_sys_info(serial_port, verbose=False):
     """ Get the system config information of the tag device through UART
 
         :returns:
@@ -116,29 +147,67 @@ def get_sys_info(serial_port, verbose=False):
     return sys_info
 
 
+def config_uart_settings(serial_port, settings):
+    pass 
+
+
 def make_json_dic(raw_string):
-    # sample input:
-    # les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
-    # lep\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
-    # lec\n: POS,7.10,5.24,-2.03,53
-    data = {}
-    # parse csv
-    raw_elem = raw_string.split(',')
-    num_anc = int(raw_elem[1])
-    data['anc_num'] = int(raw_elem[1])
-    all_anc_id = []
-    for i in range(num_anc):
-        data[raw_elem[2+6*i+1]] = {}
-        data[raw_elem[2+6*i+1]]['anc_id'] = raw_elem[2+6*i]
-        all_anc_id.append(raw_elem[2+6*i+1])
-        data[raw_elem[2+6*i+1]]['x'] = float(raw_elem[2+6*i+2])
-        data[raw_elem[2+6*i+1]]['y'] = float(raw_elem[2+6*i+3])
-        data[raw_elem[2+6*i+1]]['z'] = float(raw_elem[2+6*i+4])
-        data[raw_elem[2+6*i+1]]['dist_to'] = float(raw_elem[2+6*i+5])
-    data['all_anc_id'] = all_anc_id
-    data['est_pos'] = {}
-    data['est_pos']['x'] = float(raw_elem[-4])
-    data['est_pos']['y'] = float(raw_elem[-3])
-    data['est_pos']['z'] = float(raw_elem[-2])
-    data['est_qual'] = float(raw_elem[-1])
+    """ Parse the raw string reporting to make JSON-style dictionary
+        sample input:
+        les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
+        lep\n: POS,7.10,5.24,-2.03,53
+        lec\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
+        Notice: wrong-format (convoluted) UART reportings exist at high update rate. 
+            e.g.(lec\n): 
+            DIST,4,AN0,0090,0.00,0.00,0.00,3.25,AN1,D91E,0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00
+            AN3 is reported in a wrong format. Use regular expression to avoid discarding the entire reporting.
+        :returns:
+            Dictionary of parsed UWB reporting
+    """
+    try:
+        data = {}
+        # ---------parse for anchors and individual readings---------
+        anc_match_iter = re.finditer(   "(?<=AN)(?P<anc_idx>[0-9]{1})[,]"
+                                        "(?P<anc_id>.{4})[,]"
+                                        "(?P<anc_x>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<anc_y>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<anc_z>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<dist_to>[+-]?[0-9]*[.][0-9]{2})", raw_string)
+        all_anc_id = []
+        num_anc = 0
+        for regex_match in anc_match_iter:
+            anc_id = regex_match.group("anc_id")
+            all_anc_id.append(anc_id)
+            data[anc_id] = {}
+            data[anc_id]['anc_id'] = anc_id
+            data[anc_id]['x'] = float(regex_match.group("anc_x"))
+            data[anc_id]['y'] = float(regex_match.group("anc_y"))
+            data[anc_id]['z'] = float(regex_match.group("anc_z"))
+            data[anc_id]['dist_to'] = float(regex_match.group("dist_to"))
+            num_anc += 1
+        data['anc_num'] = num_anc
+        data['all_anc_id'] = all_anc_id
+        # ---------if location is calculated, parse calculated location---------
+        pos_match = re.search("(?<=POS[,])"
+                                "(?P<pos_x>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<pos_y>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<pos_z>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<qual>[0-9]*)", raw_string)
+        if pos_match:
+            data['est_pos'] = {}
+            data['est_pos']['x'] = float(pos_match.group("pos_x"))
+            data['est_pos']['y'] = float(pos_match.group("pos_y"))
+            data['est_pos']['z'] = float(pos_match.group("pos_z"))
+            data['est_qual'] = int(pos_match.group("qual"))
+    except BaseException as e:
+        sys.stdout.write(timestamp_log() + "JSON dictionary regex parsing failed: raw string: {} \n".format(raw_string))
+        raise e
     return data
+
+
+if __name__ == "__main__":
+    unittest = make_json_dic
+    unittest_input_0 = "DIST,4,AN0,0090,0.00,0.00,0.00,-3.25,AN1,D91E,0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00"
+    unittest_input_1 = "DIST,4,AN0,0090,0.00,0.00,0.00,-3.25,AN1,D91E,-0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00,POS,6.95,5.37,-1.97,52"
+    print(unittest(unittest_input_1))
+    

@@ -146,7 +146,6 @@ def dwm_pos_set(t, coords, qual_fact_percent, unit="mm", verbose=False):
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
     error_handler(TLV_response, err_code, _func_name)
-    # Parsing the returned TLV value
     # do nothing
     return [err_code]
 
@@ -246,7 +245,6 @@ def dwm_upd_rate_set(t, act_upd_intval, sta_upd_intval, unit="100ms", verbose=Fa
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
     error_handler(TLV_response, err_code, _func_name)
-    # Parsing the returned TLV value
     # do nothing
     return [err_code]
 
@@ -372,7 +370,6 @@ def dwm_cfg_tag_set(t,
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
     error_handler(TLV_response, err_code, _func_name)
-    # Parsing the returned TLV value
     # do nothing
     return [err_code]
     
@@ -451,7 +448,6 @@ def dwm_cfg_anchor_set( t,
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
     error_handler(TLV_response, err_code, _func_name)
-    # Parsing the returned TLV value
     # do nothing
     return [err_code]
 
@@ -825,7 +821,6 @@ def dwm_baddr_set(t, ble_addr, verbose=False):
     if verbose:
         verbose_response(TLV_response, err_code, _func_name)
     error_handler(TLV_response, err_code, _func_name)
-    # Parsing the returned TLV value
     # do nothing
     return [err_code]
 

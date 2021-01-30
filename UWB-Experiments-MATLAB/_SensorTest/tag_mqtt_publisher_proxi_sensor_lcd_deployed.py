@@ -189,30 +189,56 @@ def get_sys_info(serial_port, verbose=False):
 
 
 def make_json_dic(raw_string):
-    # sample input:
-    # les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
-    # lep\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
-    # lec\n: POS,7.10,5.24,-2.03,53
-    data = {}
-    # parse csv
-    raw_elem = raw_string.split(',')
-    num_anc = int(raw_elem[1])
-    data['anc_num'] = int(raw_elem[1])
-    all_anc_id = []
-    for i in range(num_anc):
-        data[raw_elem[2+6*i+1]] = {}
-        data[raw_elem[2+6*i+1]]['anc_id'] = raw_elem[2+6*i]
-        all_anc_id.append(raw_elem[2+6*i+1])
-        data[raw_elem[2+6*i+1]]['x'] = float(raw_elem[2+6*i+2])
-        data[raw_elem[2+6*i+1]]['y'] = float(raw_elem[2+6*i+3])
-        data[raw_elem[2+6*i+1]]['z'] = float(raw_elem[2+6*i+4])
-        data[raw_elem[2+6*i+1]]['dist_to'] = float(raw_elem[2+6*i+5])
-    data['all_anc_id'] = all_anc_id
-    data['est_pos'] = {}
-    data['est_pos']['x'] = float(raw_elem[-4])
-    data['est_pos']['y'] = float(raw_elem[-3])
-    data['est_pos']['z'] = float(raw_elem[-2])
-    data['est_qual'] = float(raw_elem[-1])
+    """ Parse the raw string reporting to make JSON-style dictionary
+        sample input:
+        les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
+        lep\n: POS,7.10,5.24,-2.03,53
+        lec\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
+        Notice: wrong-format (convoluted) UART reportings exist at high update rate. 
+            e.g.(lec\n): 
+            DIST,4,AN0,0090,0.00,0.00,0.00,3.25,AN1,D91E,0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00
+            AN3 is reported in a wrong format. Use regular expression to avoid discarding the entire reporting.
+        :returns:
+            Dictionary of parsed UWB reporting
+    """
+    try:
+        data = {}
+        # ---------parse for anchors and individual readings---------
+        anc_match_iter = re.finditer(   "(?<=AN)(?P<anc_idx>[0-9]{1})[,]"
+                                        "(?P<anc_id>.{4})[,]"
+                                        "(?P<anc_x>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<anc_y>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<anc_z>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<dist_to>[+-]?[0-9]*[.][0-9]{2})", raw_string)
+        all_anc_id = []
+        num_anc = 0
+        for regex_match in anc_match_iter:
+            anc_id = regex_match.group("anc_id")
+            all_anc_id.append(anc_id)
+            data[anc_id] = {}
+            data[anc_id]['anc_id'] = anc_id
+            data[anc_id]['x'] = float(regex_match.group("anc_x"))
+            data[anc_id]['y'] = float(regex_match.group("anc_y"))
+            data[anc_id]['z'] = float(regex_match.group("anc_z"))
+            data[anc_id]['dist_to'] = float(regex_match.group("dist_to"))
+            num_anc += 1
+        data['anc_num'] = num_anc
+        data['all_anc_id'] = all_anc_id
+        # ---------if location is calculated, parse calculated location---------
+        pos_match = re.search("(?<=POS[,])"
+                                "(?P<pos_x>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<pos_y>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<pos_z>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<qual>[0-9]*)", raw_string)
+        if pos_match:
+            data['est_pos'] = {}
+            data['est_pos']['x'] = float(pos_match.group("pos_x"))
+            data['est_pos']['y'] = float(pos_match.group("pos_y"))
+            data['est_pos']['z'] = float(pos_match.group("pos_z"))
+            data['est_qual'] = int(pos_match.group("qual"))
+    except BaseException as e:
+        sys.stdout.write(timestamp_log() + "JSON dictionary regex parsing failed: raw string: {} \n".format(raw_string))
+        raise e
     return data
 
 

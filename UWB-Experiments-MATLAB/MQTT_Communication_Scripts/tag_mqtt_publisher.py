@@ -132,34 +132,56 @@ def get_sys_info(serialport, verbose=False):
     return sys_info
 
 def make_json_dic(raw_string):
-    # sample input:
-    # les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
-    # lep\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
-    # lec\n: POS,7.10,5.24,-2.03,53
-    # TODO: adapt for listener's input. Listener's input is a little different
-    # Listener data sample input: (Listner's input contains tag identifiers)
-    # les\n: [256762.460 INF] loc_data: 1
-    #  0) D09C[5.85,4.33,-1.97,65,x07]
-    #  1) 9421[5.34,4.12,-1.31,63,x09]
-    # lec\n: POS,0,D09C,5.85,4.33,-1.96,65,x07
-    # lep\n: the same as lec\n
-    data = {}
-    # parse csv
-    raw_elem = raw_string.split(',')
-    num_anc = int(raw_elem[1])
-    data['anc_num'] = int(raw_elem[1])
-    for i in range(num_anc):
-        data[raw_elem[2+6*i]] = {}
-        data[raw_elem[2+6*i]]['anc_id'] = raw_elem[2+6*i+1]
-        data[raw_elem[2+6*i]]['x'] = float(raw_elem[2+6*i+2])
-        data[raw_elem[2+6*i]]['y'] = float(raw_elem[2+6*i+3])
-        data[raw_elem[2+6*i]]['z'] = float(raw_elem[2+6*i+4])
-        data[raw_elem[2+6*i]]['dist_to'] = float(raw_elem[2+6*i+5])
-    data['est_pos'] = {}
-    data['est_pos']['x'] = float(raw_elem[-4])
-    data['est_pos']['y'] = float(raw_elem[-3])
-    data['est_pos']['z'] = float(raw_elem[-2])
-    data['est_qual'] = float(raw_elem[-1])
+    """ Parse the raw string reporting to make JSON-style dictionary
+        sample input:
+        les\n: 022E[7.94,8.03,0.00]=3.38 9280[7.95,0.00,0.00]=5.49 DCAE[0.00,8.03,0.00]=7.73 5431[0.00,0.00,0.00]=9.01 le_us=3082 est[6.97,5.17,-1.77,53]
+        lep\n: POS,7.10,5.24,-2.03,53
+        lec\n: DIST,4,AN0,022E,7.94,8.03,0.00,3.44,AN1,9280,7.95,0.00,0.00,5.68,AN2,DCAE,0.00,8.03,0.00,7.76,AN3,5431,0.00,0.00,0.00,8.73,POS,6.95,5.37,-1.97,52
+        Notice: wrong-format (convoluted) UART reportings exist at high update rate. 
+            e.g.(lec\n): 
+            DIST,4,AN0,0090,0.00,0.00,0.00,3.25,AN1,D91E,0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00
+            AN3 is reported in a wrong format. Use regular expression to avoid discarding the entire reporting.
+        :returns:
+            Dictionary of parsed UWB reporting
+    """
+    try:
+        data = {}
+        # ---------parse for anchors and individual readings---------
+        anc_match_iter = re.finditer(   "(?<=AN)(?P<anc_idx>[0-9]{1})[,]"
+                                        "(?P<anc_id>.{4})[,]"
+                                        "(?P<anc_x>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<anc_y>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<anc_z>[+-]?[0-9]*[.][0-9]{2})[,]"
+                                        "(?P<dist_to>[+-]?[0-9]*[.][0-9]{2})", raw_string)
+        all_anc_id = []
+        num_anc = 0
+        for regex_match in anc_match_iter:
+            anc_id = regex_match.group("anc_id")
+            all_anc_id.append(anc_id)
+            data[anc_id] = {}
+            data[anc_id]['anc_id'] = anc_id
+            data[anc_id]['x'] = float(regex_match.group("anc_x"))
+            data[anc_id]['y'] = float(regex_match.group("anc_y"))
+            data[anc_id]['z'] = float(regex_match.group("anc_z"))
+            data[anc_id]['dist_to'] = float(regex_match.group("dist_to"))
+            num_anc += 1
+        data['anc_num'] = num_anc
+        data['all_anc_id'] = all_anc_id
+        # ---------if location is calculated, parse calculated location---------
+        pos_match = re.search("(?<=POS[,])"
+                                "(?P<pos_x>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<pos_y>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<pos_z>[-+]?[0-9]*[.][0-9]{2})[,]"
+                                "(?P<qual>[0-9]*)", raw_string)
+        if pos_match:
+            data['est_pos'] = {}
+            data['est_pos']['x'] = float(pos_match.group("pos_x"))
+            data['est_pos']['y'] = float(pos_match.group("pos_y"))
+            data['est_pos']['z'] = float(pos_match.group("pos_z"))
+            data['est_qual'] = int(pos_match.group("qual"))
+    except BaseException as e:
+        sys.stdout.write(timestamp_log() + "JSON dictionary regex parsing failed: raw string: {} \n".format(raw_string))
+        raise e
     return data
 
 def on_exit(serialport, verbose=False):
@@ -189,7 +211,7 @@ def available_ttys(portlist):
             if port.isOpen():
                 try:
                     fcntl.flock(port.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except (IOError, BlcokingIOError):
+                except (IOError, BlockingIOError):
                     sys.stdout.write(timestamp_log() + "Port is busy\n")
                 else:
                     yield port
@@ -210,7 +232,7 @@ if __name__ == "__main__":
         try:
             fcntl.flock(t.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except (IOError, BlockingIOError) as exp:
-            sys.stdout.write(timestamp_log() + "Port is busy. Another process is accessing the port. \n")
+            sys.stdout.write(timestamp_log() + "Port is busy. Another process is accessing the port\n")
             raise exp
         else:
             sys.stdout.write(timestamp_log() + "Port is ready.\n")
