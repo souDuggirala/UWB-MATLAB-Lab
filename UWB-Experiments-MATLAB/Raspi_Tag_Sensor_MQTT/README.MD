@@ -10,7 +10,7 @@ To setup a new Raspi-GPIO-Tag: 
 6. create tag_pub_service.sh at ~/tag_mqtt_publisher/ with content as following. Make it executable using chmod +x
     #!/bin/bash
     # starting the python publisher, with console standard output/errors
-    # both stored in /home/pi/tag_mqtt_publisher/tag_pub_out.log
+    # both stored in /home/pi/tag_pub_out.log
     echo "initialization of mqtt pub service - tag"
     nohup python3 -u /home/pi/tag_mqtt_publisher.py >> /home/pi/tag_pub_out.log 2>&1 &
 7. copy tag_mqtt_publisher.py to ~/tag_mqtt_publisher/
@@ -35,8 +35,8 @@ To setup a new Raspi-GPIO-Tag: 
     printf "My IP address is %s\n" "$_IP"
     fi
 
-    chmod +x /home/pi/tag_mqtt_publisher/tag_pub_service.sh
-    sh /home/pi/tag_mqtt_publisher/tag_pub_service.sh &
+    chmod +x /home/pi/tag_pub_service.sh
+    sh /home/pi/tag_pub_service.sh &
 
     exit 0
 10. make the rc.local executable by chmod +x
