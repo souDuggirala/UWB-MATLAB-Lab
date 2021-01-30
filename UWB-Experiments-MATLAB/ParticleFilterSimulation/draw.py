@@ -49,7 +49,7 @@ class Maze(object):
             turtle.register_shape("dot", ((-3,-3), (-3,3), (3,3), (3,-3)))
             turtle.register_shape("tri", ((-3, -2), (0, 3), (3, -2), (0, 0)))
             turtle.speed(10)
-            turtle.setworldcoordinates(0, 0, 350, 350)
+            turtle.setworldcoordinates(0, 0, 500, 500)
             turtle.title("Poor robbie is lost")
             turtle.setworldcoordinates(0, 0, self.length, self.width)
             self.one_px = float(turtle.window_width()) / float(self.length) / 0.002
@@ -88,7 +88,7 @@ class Maze(object):
         or y < min(self.anchor_y_list) \
         or y > max(self.anchor_y_list):
             if kwargs.get('z_range', None) is None:
-                return False
+                pass
             else:
                 if z > kwargs.get('z_range')[1] \
                 or z < kwargs.get('z_range')[0]:
@@ -179,16 +179,16 @@ class Maze(object):
     def distance_to_nearest_beacon(self, x, y, z=0) -> float:
         d = float('inf')
         for i in range(len(self.beacons)):
-            c_x, c_y = self.beacons[i][1], self.beacons[i][2]
-            distance = self.euclidean_dist_xy(c_x, c_y, x, y)
+            c_x, c_y, c_z = self.beacons[i][1], self.beacons[i][2], self.beacons[i][3]
+            distance = self.euclidean_dist(c_x, c_y, c_z, x, y, z)
             if distance < d:
                 d = distance
-                d_x, d_y = c_x, c_y
+                d_x, d_y, d_z = c_x, c_y, c_z
         return d
     
     def distances_to_all_beacons(self, x, y, z=0) -> Tuple:
         dist = []
         for i in range(len(self.beacons)):
-            c_x, c_y = self.beacons[i][1], self.beacons[i][2]
-            dist.append(self.euclidean_dist_xy(c_x, c_y, x, y))
+            c_x, c_y, c_z = self.beacons[i][1], self.beacons[i][2], self.beacons[i][3]
+            dist.append(self.euclidean_dist(c_x, c_y, c_z, x, y, z))
         return dist
