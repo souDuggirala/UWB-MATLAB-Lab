@@ -177,9 +177,7 @@ def is_reporting_loc(serial_port, timeout=2):
     time.sleep(timeout)
     final_bytes_avail = serial_port.in_waiting
     if final_bytes_avail - init_bytes_avail > 0:
-        time.sleep(0.1)
         return True
-    time.sleep(0.1)
     return False
 
     

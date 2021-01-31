@@ -110,9 +110,10 @@ if __name__ == "__main__":
     # Match the serial ports with the device list    
     for dev in serial_devices:
         p = serial.Serial(dev, baudrate=115200, timeout=3.0)        
+        port_available_check(p)
         # Initialize the UART shell command
         parse_uart_init(p)
-        sys_info = get_sys_info(p, verbose=False)
+        sys_info = parse_uart_sys_info(p)
         device_id_short = sys_info.get("device_id")[-4:]
         # Link the individual Master/Slave with the serial ports by hashmap
         serial_ports[device_id_short] = {}
@@ -143,15 +144,13 @@ if __name__ == "__main__":
     
     while True:
         # wait for new UWB reporting results
-        a_end_dist, b_end_dist = a_end_dist_ptr[0], b_end_dist_ptr[0]
+        a_end_dist_old, b_end_dist_old = a_end_dist_ptr[0], b_end_dist_ptr[0]
         while True:
-            a_end_dist_new, b_end_dist_new = a_end_dist_ptr[0], b_end_dist_ptr[0]
-            if a_end_dist_new is a_end_dist and b_end_dist_new is b_end_dist:
+            a_end_dist, b_end_dist = a_end_dist_ptr[0], b_end_dist_ptr[0]
+            if a_end_dist is a_end_dist_old and b_end_dist is b_end_dist_old:
                 continue
             else:
-                a_end_dist, b_end_dist = a_end_dist_new, b_end_dist_new
                 break
-        
         a_ranging_results, b_ranging_results = [], []        
         for anc in a_end_dist.get("all_anc_id", []):
             if anc == a_end_slave or anc == b_end_slave:
@@ -163,6 +162,7 @@ if __name__ == "__main__":
             b_ranging_results.append((anc, b_end_dist_ptr[0].get(anc, {}))) 
         a_ranging_results.sort(key=lambda x: x[1].get("dist_to", float("inf")))
         b_ranging_results.sort(key=lambda x: x[1].get("dist_to", float("inf")))
+        
         print("A end reporting: ", a_ranging_results)
         print("B end reporting: ", b_ranging_results)
-        # time.sleep(1)
+        
