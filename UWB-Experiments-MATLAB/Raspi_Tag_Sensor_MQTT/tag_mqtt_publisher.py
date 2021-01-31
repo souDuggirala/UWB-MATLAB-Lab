@@ -97,9 +97,10 @@ def lcd_thread_job(data_pointer):
                 continue
             proxi = data_pointer[0].get("proximity", None)
             coords = data_pointer[0].get('est_pos', None)
-            line1 = "Proxi: {} cm".format(proxi) if proxi is not None else "Proxi:OutOfRange"
-            line2 = "x:{:.2f} y:{:.2f} m".format(coords['x'], coords['y'])
-            lcd_disp(line1, line2)
+            if proxi and coords:
+                line1 = "Proxi: {} cm".format(proxi) if proxi is not None else "Proxi:OutOfRange"
+                line2 = "x:{:.2f} y:{:.2f} m".format(coords['x'], coords['y'])
+                lcd_disp(line1, line2)
             
     except BaseException as e:
         raise(e)
