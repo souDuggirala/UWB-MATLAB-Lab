@@ -49,28 +49,6 @@ def parse_uart_init(serial_port):
 def config_uart_settings(serial_port, settings):
     pass
 
-
-def parse_uart_reportings(serial_port, data_pointer):
-    if data_pointer[0] is None:
-        data_pointer[0] = {}
-    while True:
-        try:
-            data = str(serial_port.readline(), encoding="UTF-8").rstrip()
-            if not data[:4] == "DIST":
-                continue
-            data_pointer[0] = make_json_dic(data)
-            # data_pointer[0]['tag_id'] = tag_id
-            data_pointer[0]['superFrameNumber'] = super_frame
-            json_data = json.dumps(json_dic)
-            # tag_client.publish("Tag/{}/Uplink/Location".format(tag_id[-4:]), json_data, qos=0, retain=True)
-            super_frame += 1
-            # pass out coordinates using uwb_pointer[0] pointer for other threads
-            uwb_pointer[0] = json_dic
-        except Exception as exp:
-            data = str(serial_port.readline(), encoding="UTF-8").rstrip()
-            sys.stdout.write(timestamp_log() + data)
-            raise exp
-
         
 def end_ranging_thread_job(port_info_dict, data_pointer):
     port = port_info_dict.get("port")

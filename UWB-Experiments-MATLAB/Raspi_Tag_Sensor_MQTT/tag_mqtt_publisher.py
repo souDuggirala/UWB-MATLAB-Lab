@@ -50,7 +50,7 @@ def report_uart_data(serial_port, uwb_pointer, proximity_pointer):
         try:
             data = str(serial_port.readline(), encoding="UTF-8").rstrip()
             if not data[:4] == "DIST":
-                continue
+                continue            
             json_dic = make_json_dic(data)
             json_dic['tag_id'] = tag_id
             json_dic['superFrameNumber'] = super_frame
@@ -100,7 +100,7 @@ def lcd_thread_job(data_pointer):
             line1 = "Proxi: {} cm".format(proxi) if proxi is not None else "Proxi:OutOfRange"
             line2 = "x:{:.2f} y:{:.2f} m".format(coords['x'], coords['y'])
             lcd_disp(line1, line2)
-            time.sleep(0.1)
+            
     except BaseException as e:
         raise(e)
 
