@@ -4,11 +4,13 @@ import os, platform, sys, json
 
 import serial, glob, re
 import time
-from utils import *
 
 import subprocess, atexit, signal
 
 import threading
+
+from utils import *
+from lcd import lcd_init, lcd_disp
 
 # ttyACM0 -> 421F
 # ttyACM1 -> 0487
@@ -49,12 +51,12 @@ def parse_uart_init(serial_port):
 def config_uart_settings(serial_port, settings):
     pass
 
-        
+
 def end_ranging_thread_job(port_info_dict, data_pointer):
     port = port_info_dict.get("port")
     sys_info = port_info_dict.get("sys_info")
     atexit.register(on_exit, port, True)
-    
+
     # tag_id = sys_info.get("device_id") 
     # type "lec\n" to the dwm shell console to activate data reporting
     if not is_reporting_loc(port, timeout=sys_info.get("upd_rate")/10):        
@@ -84,7 +86,8 @@ def end_ranging_thread_job(port_info_dict, data_pointer):
 
 if __name__ == "__main__":
     # Manually change the device setting file (json) before run this program.
-    config_data = load_config_json("./uwb_device_config.json")
+    dirname = os.path.dirname(__file__)
+    config_data = load_config_json(os.path.join(dirname, "uwb_device_config.json"))
     uwb_devices = config_data.get("uwb_devices", [])
     self_id = config_data.get("id", None) # id of self
     vehicles = {} # the hashmap of all vehicles, self and others
@@ -141,7 +144,7 @@ if __name__ == "__main__":
     a_end_ranging_thread.start()
     b_end_ranging_thread.start()
     
-    
+    lcd_init()
     while True:
         # wait for new UWB reporting results
         a_end_dist_old, b_end_dist_old = a_end_dist_ptr[0], b_end_dist_ptr[0]
@@ -151,7 +154,7 @@ if __name__ == "__main__":
                 continue
             else:
                 break
-        a_ranging_results, b_ranging_results = [], []        
+        a_ranging_results, b_ranging_results = [], []  
         for anc in a_end_dist.get("all_anc_id", []):
             if anc == a_end_slave or anc == b_end_slave:
                 continue
@@ -159,10 +162,13 @@ if __name__ == "__main__":
         for anc in b_end_dist.get("all_anc_id", []):
             if anc == a_end_slave or anc == b_end_slave:
                 continue
-            b_ranging_results.append((anc, b_end_dist_ptr[0].get(anc, {}))) 
+            b_ranging_results.append((anc, b_end_dist_ptr[0].get(anc, {})))
+            
         a_ranging_results.sort(key=lambda x: x[1].get("dist_to", float("inf")))
         b_ranging_results.sort(key=lambda x: x[1].get("dist_to", float("inf")))
-        
+        line1 = "A End:{} {}".format(a_ranging_results[0][0], a_ranging_results[0][1]["dist_to"]) if a_ranging_results else "A End OutOfRange"
+        line2 = "B End:{} {}".format(b_ranging_results[0][0], b_ranging_results[0][1]["dist_to"]) if b_ranging_results else "B End OutOfRange"
+        lcd_disp(line1, line2)
         print("A end reporting: ", a_ranging_results)
         print("B end reporting: ", b_ranging_results)
         
