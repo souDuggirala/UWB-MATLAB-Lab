@@ -29,7 +29,7 @@ def reportlog(data: list()):
     file_ext = time.strftime("%Y%m%d") + ".log"
     # complete file name
     filename = filename_base + file_ext
-    filepath = log_dirname+"/"+filename
+    filepath = dirname+"/"+log_dirname+"/"+filename
     # check if dir exists, if not it will create directory 
     if not os.path.isdir(dirname+ "/" + log_dirname):
         os.makedirs("logs")
