@@ -1,5 +1,3 @@
-
-
 import os, platform, sys, json
 
 import serial, glob, re
@@ -16,6 +14,34 @@ from lcd import lcd_init, lcd_disp
 # ttyACM1 -> 0487
 # ttyACM2 -> 0E15
 # ttyACM3 -> 15BA
+
+
+def reportlog(data: list()):
+    """ This method logs the ranging data on daily basis.
+    """    
+    # this will get the absolute path 
+    dirname = os.path.dirname(os.path.abspath(__file__))
+    # log file basename
+    filename_base = "UWB_RANGING_"
+    # log dir name
+    log_dirname = "logs"
+    # file suffix with extension
+    file_ext = time.strftime("%Y%m%d") + ".log"
+    # complete file name
+    filename = filename_base + file_ext
+    filepath = log_dirname+"/"+filename
+    # check if dir exists, if not it will create directory 
+    if not os.path.isdir(dirname+ "/" + log_dirname):
+        os.makedirs("logs")
+        
+    # check if file exists, if exists the write in append mode  
+    # if not it will create file and append  
+    mode = 'a' if os.path.exists(filepath) else 'w'
+    with open(filepath, mode) as f:
+        f.write(time.strftime("%Y%m%d-%H%M%S")+'\n')
+        for line in data:
+            f.write(line+'\n')
+    f.close()
 
 def on_exit(serialport, verbose=False):
     """ On exit callbacks to make sure the serialport is closed when
@@ -169,6 +195,8 @@ if __name__ == "__main__":
         line1 = "A End:{} {}".format(a_ranging_results[0][0], a_ranging_results[0][1]["dist_to"]) if a_ranging_results else "A End OutOfRange"
         line2 = "B End:{} {}".format(b_ranging_results[0][0], b_ranging_results[0][1]["dist_to"]) if b_ranging_results else "B End OutOfRange"
         lcd_disp(line1, line2)
-        print("A end reporting: ", a_ranging_results)
-        print("B end reporting: ", b_ranging_results)
+        #print("A end reporting: ", a_ranging_results)
+        #print("B end reporting: ", b_ranging_results)
+        # calling report log method 
+        reportlog(["A end reporting: " +str(a_ranging_results),"B end reporting: " + str(b_ranging_results)])
         
