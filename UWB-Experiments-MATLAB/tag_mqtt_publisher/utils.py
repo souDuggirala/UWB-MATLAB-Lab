@@ -1,4 +1,5 @@
 from datetime import datetime
+from time import localtime
 import os, sys, time, json, re
 import atexit, signal
 
@@ -18,8 +19,9 @@ def timestamp_log(incl_UTC=False):
         :returns:
             string format local timestamp with option to include UTC 
     """
-    local_timestp = "["+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))+" local] "
-    utc_timestp = "["+str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))+" UTC] "
+    lt = localtime()
+    local_timestp = "["+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3]+ " "+ lt.tm_zone + "] "
+    utc_timestp = "["+str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3]+" UTC] "
     if incl_UTC:
         return local_timestp + utc_timestp
     else:
@@ -271,3 +273,9 @@ def make_json_dic(raw_string):
         sys.stdout.write(timestamp_log() + "JSON dictionary regex parsing failed: raw string: {} \n".format(raw_string))
         raise e
     return data
+
+
+if __name__ == "__main__":
+    unittest = timestamp_log
+
+    print(unittest())

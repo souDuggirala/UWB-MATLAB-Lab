@@ -1,4 +1,5 @@
 from datetime import datetime
+from time import localtime
 import sys, time, json, re
 import atexit, signal
 
@@ -58,8 +59,9 @@ def timestamp_log(incl_UTC=False):
         :returns:
             string format local timestamp with option to include UTC 
     """
-    local_timestp = "["+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))+" local] "
-    utc_timestp = "["+str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))+" UTC] "
+    lt = localtime()
+    local_timestp = "["+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3]+ " "+ lt.tm_zone + "] "
+    utc_timestp = "["+str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3]+" UTC] "
     if incl_UTC:
         return local_timestp + utc_timestp
     else:
@@ -350,10 +352,10 @@ def decode_slave_info_position(ranging_json_dict):
     return slave_info_dict
 
 if __name__ == "__main__":
-    unittest = decode_slave_info_position
+    unittest = timestamp_log
     unittest_input_0 = "DIST,4,AN0,0090,0.00,0.00,0.00,-3.25,AN1,D91E,0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00"
     unittest_input_1 = "DIST,4,AN0,0090,0.00,0.00,0.00,-3.25,AN1,D91E,-0.00,0.00,0.00,3.33,AN2,0487,0.00,0.00,0.00,0.18,AN3,15BA,0.00,0,AN3,15BA,0.00,0.00,0.00,0.00,POS,6.95,5.37,-1.97,52"
     input_1 = {'all_anc_id':['459A','0B1E'],'459A':{'anc_id': '459A', 'x': -1525078912, 'y': -60523264, 'z': 63744, 'dist_to': 2833, 'anc_qf': 100}, '0B1E':{'anc_id': '0B1E', 'x': -870767360, 'y': -60522752, 'z': 64256, 'dist_to': 2969, 'anc_qf': 100}}
     
-    print(unittest(input_1))
+    print(unittest())
     
